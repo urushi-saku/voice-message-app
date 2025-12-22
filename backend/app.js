@@ -29,6 +29,20 @@ app.post('/upload', upload.single('voice'), (req, res) => {
   res.json({ filename: req.file.filename });
 });
 
+// 音声ファイル一覧取得API
+app.get('/voices', (req, res) => {
+  if (!fs.existsSync(uploadDir)) {
+    return res.json({ files: [] });
+  }
+  
+  const files = fs.readdirSync(uploadDir).filter(file => {
+    // 音声ファイルのみフィルタ（m4a, mp3, wav, aac など）
+    return /\.(m4a|mp3|wav|aac|ogg)$/i.test(file);
+  });
+  
+  res.json({ files });
+});
+
 // 音声ファイルダウンロードAPI
 app.get('/voice/:filename', (req, res) => {
   const filePath = path.join(uploadDir, req.params.filename);
