@@ -1,0 +1,18 @@
+# Node.js
+node_modules/
+.env
+
+# Flutter
+build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# その他
+*.log
