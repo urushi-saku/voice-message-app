@@ -22,6 +22,21 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- ========================================
+	     iOS マイク使用許可メッセージ
+	     ======================================== 
+	     初学者向け説明:
+	     iPhoneやiPadでアプリを使用するとき、ユーザーにマイクの使用許可を求めるための
+	     メッセージです。このメッセージはユーザーが「許可」「許可しない」を選択する
+	     ダイアログに表示されます。
+	     
+	     ポイント：
+	     - このメッセージはユーザーに分かりやすく、なぜマイクが必要なのかを説明する
+	       必要があります
+	     - このキー（NSMicrophoneUsageDescription）がないと、アプリはiOSで音声録音
+	       ができません
+	     - 他のプライバシーに関わる機能（カメラ、位置情報など）にも同様のキーが必要です
+	  -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>音声メッセージを録音するためにマイクへのアクセスが必要です</string>
 	<key>LSRequiresIPhoneOS</key>

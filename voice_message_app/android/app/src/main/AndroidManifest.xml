@@ -1,8 +1,31 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- マイクと外部ストレージのパーミッション -->
+    <!-- ========================================
+         Android パーミッション（アプリが使う機能の許可設定）
+         ========================================
+         以下のパーミッションはアプリが必要とする機能をAndroidに伝えるものです。
+         Androidユーザーはアプリをインストール時または使用時にこれらの許可を与える必要があります。
+    -->
+    
+    <!-- RECORD_AUDIO: マイクの使用許可
+         説明: アプリがスマートフォンのマイクから音声を録音するために必要
+         用途: 音声メッセージの録音機能で使用 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <!-- WRITE_EXTERNAL_STORAGE: 外部ストレージへの書き込み許可
+         説明: アプリがスマートフォンの外部ストレージ（SDカードやダウンロードフォルダなど）
+               にファイルを保存するために必要
+         用途: 録音した音声ファイルをスマートフォンに保存するために使用 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <!-- READ_EXTERNAL_STORAGE: 外部ストレージの読み込み許可
+         説明: アプリが外部ストレージに保存されたファイルを読み込むために必要
+         用途: 以前に保存した音声ファイルを再生するときに使用 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    
+    <!-- INTERNET: インターネット接続の許可
+         説明: アプリがインターネットを使用してサーバーと通信するために必要
+         用途: 音声ファイルをサーバーにアップロードしたり、サーバーから音声ファイルを
+               ダウンロードしたりするときに使用 -->
     <uses-permission android:name="android.permission.INTERNET" />
     
     <application
