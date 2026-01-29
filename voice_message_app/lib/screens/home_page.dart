@@ -1,17 +1,19 @@
 // ========================================
-// ホームページ - メイン画面
+// ホームページ - メイン画面（タブ管理）
 // ========================================
 // 初学者向け説明：
 // このファイルは、アプリのメイン画面を表示します
-// 録音ボタンと、サーバーから取得した音声の一覧を表示します
+// 3つのタブ（ボイスメッセージ、フォロワー、受信ファイル）を管理します
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/audio_service.dart';
 import '../services/api_service.dart';
 import 'profile_page.dart';
+import 'followers_tab.dart';
+import 'received_files_tab.dart';
 
-/// ホームページウィジェット（音声録音と一覧表示）
+/// ホームページウィジェット（タブナビゲーション）
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -20,6 +22,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // ========================================
+  // タブの状態管理
+  // ========================================
+  int _currentTabIndex = 0; // 現在選択中のタブ（0=メッセージ, 1=フォロワー, 2=受信）
+
   // ========================================
   // サービスとデータ
   // ========================================
@@ -171,13 +178,120 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ========================================
+  // タブに応じたタイトルを返す
+  // ========================================
+  String _getTabTitle() {
+    switch (_currentTabIndex) {
+      case 0:
+        return 'ボイスメッセージ';
+      case 1:
+        return 'フォロワー';
+      case 2:
+        return '受信メッセージ';
+      default:
+        return 'ボイスメッセージ';
+    }
+  }
+
+  // ========================================
+  // 各タブの内容を返す
+  // ========================================
+  Widget _getCurrentTab() {
+    switch (_currentTabIndex) {
+      case 0:
+        return _buildMessagesTab(); // ボイスメッセージタブ
+      case 1:
+        return const FollowersTab(); // フォロワータブ
+      case 2:
+        return const ReceivedFilesTab(); // 受信ファイルタブ
+      default:
+        return _buildMessagesTab();
+    }
+  }
+
+  // ========================================
+  // ボイスメッセージタブの内容
+  // ========================================
+  Widget _buildMessagesTab() {
+    return Column(
+      children: [
+        // ========================================
+        // 録音ボタン
+        // ========================================
+        Container(
+          padding: const EdgeInsets.all(20),
+          child: ElevatedButton.icon(
+            icon: Icon(
+              _audioService.isRecording ? Icons.stop : Icons.mic,
+              size: 30,
+            ),
+            label: Text(
+              _audioService.isRecording ? '録音停止' : '録音開始',
+              style: const TextStyle(fontSize: 18),
+            ),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 30,
+                vertical: 15,
+              ),
+              backgroundColor:
+                  _audioService.isRecording ? Colors.red : Colors.blue,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: _toggleRecording,
+          ),
+        ),
+
+        const Divider(),
+
+        // ========================================
+        // 音声リスト
+        // ========================================
+        Expanded(
+          child: _isLoadingVoices
+              ? const Center(child: CircularProgressIndicator())
+              : _serverVoices.isEmpty
+                  ? const Center(child: Text('音声がありません'))
+                  : ListView.builder(
+                      itemCount: _serverVoices.length,
+                      itemBuilder: (context, index) {
+                        final voice = _serverVoices[index];
+                        final isPlaying = _playingVoice == voice;
+
+                        return ListTile(
+                          leading: Icon(
+                            isPlaying ? Icons.volume_up : Icons.audiotrack,
+                            color: isPlaying ? Colors.green : Colors.grey,
+                          ),
+                          title: Text(voice),
+                          trailing: IconButton(
+                            icon: Icon(
+                              isPlaying ? Icons.stop : Icons.play_arrow,
+                            ),
+                            onPressed: () {
+                              if (isPlaying) {
+                                _stopPlaying();
+                              } else {
+                                _playVoice(voice);
+                              }
+                            },
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // ========================================
   // UIを構築
   // ========================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ボイスメッセージ'),
+        title: Text(_getTabTitle()), // タブに応じたタイトル
         actions: [
           // ========================================
           // プロフィールボタン（右上）
@@ -194,80 +308,38 @@ class _HomePageState extends State<HomePage> {
               );
             },
           ),
-          // リフレッシュボタン
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '更新',
-            onPressed: _loadVoices,
-          ),
+          // リフレッシュボタン（メッセージタブのみ表示）
+          if (_currentTabIndex == 0)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: '更新',
+              onPressed: _loadVoices,
+            ),
         ],
       ),
-      body: Column(
-        children: [
-          // ========================================
-          // 録音ボタン
-          // ========================================
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: ElevatedButton.icon(
-              icon: Icon(
-                _audioService.isRecording ? Icons.stop : Icons.mic,
-                size: 30,
-              ),
-              label: Text(
-                _audioService.isRecording ? '録音停止' : '録音開始',
-                style: const TextStyle(fontSize: 18),
-              ),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 15,
-                ),
-                backgroundColor:
-                    _audioService.isRecording ? Colors.red : Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: _toggleRecording,
-            ),
+      body: _getCurrentTab(), // 現在選択中のタブを表示
+      // ========================================
+      // 下部ナビゲーションバー
+      // ========================================
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTabIndex,
+        onTap: (index) {
+          setState(() {
+            _currentTabIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.message),
+            label: 'メッセージ',
           ),
-
-          const Divider(),
-
-          // ========================================
-          // 音声リスト
-          // ========================================
-          Expanded(
-            child: _isLoadingVoices
-                ? const Center(child: CircularProgressIndicator())
-                : _serverVoices.isEmpty
-                    ? const Center(child: Text('音声がありません'))
-                    : ListView.builder(
-                        itemCount: _serverVoices.length,
-                        itemBuilder: (context, index) {
-                          final voice = _serverVoices[index];
-                          final isPlaying = _playingVoice == voice;
-
-                          return ListTile(
-                            leading: Icon(
-                              isPlaying ? Icons.volume_up : Icons.audiotrack,
-                              color: isPlaying ? Colors.green : Colors.grey,
-                            ),
-                            title: Text(voice),
-                            trailing: IconButton(
-                              icon: Icon(
-                                isPlaying ? Icons.stop : Icons.play_arrow,
-                              ),
-                              onPressed: () {
-                                if (isPlaying) {
-                                  _stopPlaying();
-                                } else {
-                                  _playVoice(voice);
-                                }
-                              },
-                            ),
-                          );
-                        },
-                      ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.people),
+            label: 'フォロワー',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inbox),
+            label: '受信',
           ),
         ],
       ),
