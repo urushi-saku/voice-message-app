@@ -232,12 +232,10 @@ class _HomePageState extends State<HomePage> {
               style: const TextStyle(fontSize: 18),
             ),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 30,
-                vertical: 15,
-              ),
-              backgroundColor:
-                  _audioService.isRecording ? Colors.red : Colors.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              backgroundColor: _audioService.isRecording
+                  ? Colors.red
+                  : Colors.blue,
               foregroundColor: Colors.white,
             ),
             onPressed: _toggleRecording,
@@ -253,34 +251,32 @@ class _HomePageState extends State<HomePage> {
           child: _isLoadingVoices
               ? const Center(child: CircularProgressIndicator())
               : _serverVoices.isEmpty
-                  ? const Center(child: Text('音声がありません'))
-                  : ListView.builder(
-                      itemCount: _serverVoices.length,
-                      itemBuilder: (context, index) {
-                        final voice = _serverVoices[index];
-                        final isPlaying = _playingVoice == voice;
+              ? const Center(child: Text('音声がありません'))
+              : ListView.builder(
+                  itemCount: _serverVoices.length,
+                  itemBuilder: (context, index) {
+                    final voice = _serverVoices[index];
+                    final isPlaying = _playingVoice == voice;
 
-                        return ListTile(
-                          leading: Icon(
-                            isPlaying ? Icons.volume_up : Icons.audiotrack,
-                            color: isPlaying ? Colors.green : Colors.grey,
-                          ),
-                          title: Text(voice),
-                          trailing: IconButton(
-                            icon: Icon(
-                              isPlaying ? Icons.stop : Icons.play_arrow,
-                            ),
-                            onPressed: () {
-                              if (isPlaying) {
-                                _stopPlaying();
-                              } else {
-                                _playVoice(voice);
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    ),
+                    return ListTile(
+                      leading: Icon(
+                        isPlaying ? Icons.volume_up : Icons.audiotrack,
+                        color: isPlaying ? Colors.green : Colors.grey,
+                      ),
+                      title: Text(voice),
+                      trailing: IconButton(
+                        icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
+                        onPressed: () {
+                          if (isPlaying) {
+                            _stopPlaying();
+                          } else {
+                            _playVoice(voice);
+                          }
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
@@ -304,9 +300,7 @@ class _HomePageState extends State<HomePage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfilePage(),
-                ),
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
               );
             },
           ),
@@ -331,18 +325,9 @@ class _HomePageState extends State<HomePage> {
           });
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.message),
-            label: 'メッセージ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people),
-            label: 'フォロワー',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.inbox),
-            label: '受信',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.message), label: 'メッセージ'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'フォロワー'),
+          BottomNavigationBarItem(icon: Icon(Icons.inbox), label: '受信'),
         ],
       ),
     );

@@ -2,11 +2,35 @@
 // 認証状態管理 Provider
 // ========================================
 // ログイン状態をアプリ全体で共有・管理するProvider
+// 
+// 【主な役割】
+// 1. ユーザー情報の管理（ユーザー名、メール、フォロワー数など）
+// 2. 認証状態の管理（ログイン中か未ログインか）
+// 3. JWT トークンの保持
+// 4. 登録・ログイン・ログアウト処理
+// 5. 画面の描画トリガー（notifyListeners）
+//
+// 【継承】
+// - ChangeNotifier: 状態変更時に画面を自動更新する基底クラス
+//   → notifyListeners()で登録済みのウィジェットが再描画される
+//
+// 【利用場面】
+// - UI層（画面）からのデータ取得
+// - 認証状態に応じた画面切り替え
+// - ログイン情報の永続化
 
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
 /// ユーザー情報を表すクラス
+/// 【メンバー変数】
+/// - id: MongoDB ObjectId（ユーザー識別子）
+/// - username: ユーザー名
+/// - email: メールアドレス
+/// - profileImage: プロフィール画像URL（オプション）
+/// - bio: 自己紹介（デフォルト空文字列）
+/// - followersCount: フォロワー数（デフォルト0）
+/// - followingCount: フォロー中の数（デフォルト0）
 class User {
   final String id;
   final String username;
@@ -27,6 +51,12 @@ class User {
   });
 
   // JSONからUserオブジェクトに変換
+  /// 【用途】
+  /// - バックエンドのレスポンス（JSON）を Dart オブジェクトに変換
+  /// 【処理】
+  /// 1. レスポンスの data.user オブジェクトまたはルートレベルから値を取得
+  /// 2. null チェック（?? で初期値を指定）
+  /// 3. User インスタンスを生成して返す
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['user']['id'] ?? json['id'] ?? '',
@@ -34,17 +64,33 @@ class User {
       email: json['user']['email'] ?? json['email'] ?? '',
       profileImage: json['user']['profileImage'] ?? json['profileImage'],
       bio: json['user']['bio'] ?? json['bio'] ?? '',
-      followersCount: json['user']['followersCount'] ?? json['followersCount'] ?? 0,
-      followingCount: json['user']['followingCount'] ?? json['followingCount'] ?? 0,
+      followersCount:
+          json['user']['followersCount'] ?? json['followersCount'] ?? 0,
+      followingCount:
+          json['user']['followingCount'] ?? json['followingCount'] ?? 0,
     );
   }
 }
 
 /// 認証状態を管理するProvider
+/// 
+/// 【ChangeNotifier を継承】
+/// - notifyListeners() で登録済みウィジェットを再描画
+/// - Consumer<AuthProvider> で画面がこのProviderを購読
+/// 
+/// 【状態変数（プライベート）】
+/// - _user: ログイン中のユーザー情報
+/// - _token: JWT トークン（API通信で使用）
+/// - _isLoading: API通信中かどうか（ローディング表示用）
+/// - _error: エラーメッセージ（画面表示用）
+/// - _isAuthenticated: ログイン状態フラグ
 class AuthProvider extends ChangeNotifier {
   // ========================================
   // 状態管理
   // ========================================
+  /// 【プライベート変数】
+  /// アンダースコア（_）で始まる変数は外部からアクセス不可
+  /// ゲッター経由でのみ読み取り可能
   User? _user; // ログイン中のユーザー情報
   String? _token; // JWT トークン
   bool _isLoading = false; // ローディング状態
@@ -54,6 +100,13 @@ class AuthProvider extends ChangeNotifier {
   // ========================================
   // ゲッター（状態を外部から取得）
   // ========================================
+  /// 【用途】
+  /// UI層（画面）がこれらのゲッターを通じて状態を読み取る
+  /// private変数(_user等)に直接アクセスできないようにするため
+  /// 
+  /// 【使用例】
+  ///   final user = authProvider.user;
+  ///   final isLoading = authProvider.isLoading;
   User? get user => _user;
   String? get token => _token;
   bool get isLoading => _isLoading;
@@ -63,6 +116,12 @@ class AuthProvider extends ChangeNotifier {
   // ========================================
   // コンストラクタ
   // ========================================
+  /// 【実行タイミング】
+  /// - AuthProvider が最初に生成される時（アプリ起動時）
+  /// - MultiProvider で ChangeNotifierProvider(create: (_) => AuthProvider())
+  /// 
+  /// 【処理】
+  /// - _initializeAuth() を呼び出して、保存トークンを確認
   AuthProvider() {
     _initializeAuth();
   }
@@ -70,14 +129,28 @@ class AuthProvider extends ChangeNotifier {
   // ========================================
   // 認証状態の初期化
   // ========================================
-  /// アプリ起動時に保存されたトークンを確認
+  /// 【処理フロー】
+  /// 1. AuthService.getToken() でshared_preferencesから保存トークンを取得
+  /// 2. トークンが存在する場合：
+  ///    a. _token = token で保持
+  ///    b. _isAuthenticated = true に設定
+  ///    c. _fetchUserInfo() でユーザー情報を取得
+  /// 3. トークンが存在しない場合：
+  ///    - _isAuthenticated = false
+  ///    - _token = null
+  ///    - _user = null
+  /// 4. notifyListeners() で UI を更新
+  ///
+  /// 【用途】
+  /// アプリ起動時に自動実行され、以前ログインしていた場合は
+  /// ホーム画面を表示し、未ログインの場合はログイン画面を表示
   Future<void> _initializeAuth() async {
     try {
       final token = await AuthService.getToken();
       if (token != null) {
         _token = token;
         _isAuthenticated = true;
-        
+
         // ユーザー情報を取得
         await _fetchUserInfo();
       }
@@ -139,19 +212,13 @@ class AuthProvider extends ChangeNotifier {
   // ユーザーログイン
   // ========================================
   /// メールアドレスとパスワードでログイン
-  Future<bool> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<bool> login({required String email, required String password}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final result = await AuthService.login(
-        email: email,
-        password: password,
-      );
+      final result = await AuthService.login(email: email, password: password);
 
       _token = result['token'];
       _user = User.fromJson(result);

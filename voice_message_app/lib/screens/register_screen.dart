@@ -43,15 +43,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (value == null || value.isEmpty) {
       return 'ユーザー名を入力してください';
     }
-    
+
     if (value.length < 3) {
       return 'ユーザー名は3文字以上で設定してください';
     }
-    
+
     if (value.length > 30) {
       return 'ユーザー名は30文字以内で設定してください';
     }
-    
+
     return null;
   }
 
@@ -59,15 +59,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (value == null || value.isEmpty) {
       return 'メールアドレスを入力してください';
     }
-    
-    final emailRegex = RegExp(
-      r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-    );
-    
+
+    final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
     if (!emailRegex.hasMatch(value)) {
       return '有効なメールアドレスを入力してください';
     }
-    
+
     return null;
   }
 
@@ -75,11 +73,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (value == null || value.isEmpty) {
       return 'パスワードを入力してください';
     }
-    
+
     if (value.length < 6) {
       return 'パスワードは6文字以上で設定してください';
     }
-    
+
     return null;
   }
 
@@ -87,11 +85,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (value == null || value.isEmpty) {
       return 'パスワードを再度入力してください';
     }
-    
+
     if (value != _passwordController.text) {
       return 'パスワードが一致しません';
     }
-    
+
     return null;
   }
 
@@ -101,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
-      
+
       final success = await authProvider.register(
         username: _usernameController.text,
         email: _emailController.text,
@@ -158,10 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'ボイスメッセージアプリに参加する',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 32),
 
@@ -293,8 +288,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         strokeWidth: 2,
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -323,14 +318,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Text(
                         'すでにアカウントを持っていますか？',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(color: Colors.grey[600]),
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.of(context)
-                              .pushReplacementNamed('/login');
+                          Navigator.of(context).pushReplacementNamed('/login');
                         },
                         child: const Text(
                           'ログイン',
