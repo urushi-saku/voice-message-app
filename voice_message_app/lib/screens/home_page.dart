@@ -7,8 +7,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import '../services/audio_service.dart';
 import '../services/api_service.dart';
+import '../providers/auth_provider.dart';
 import 'profile_page.dart';
 import 'followers_tab.dart';
 import 'received_files_tab.dart';
