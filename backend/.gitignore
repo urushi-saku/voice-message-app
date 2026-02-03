@@ -1,0 +1,22 @@
+# 環境変数
+.env
+
+# Node modules
+node_modules/
+
+# ログファイル
+*.log
+npm-debug.log*
+
+# アップロードファイル
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
