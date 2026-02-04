@@ -145,9 +145,15 @@ app.get('/health', (req, res) => {
 // サーバー起動
 // ========================================
 // 指定したPORTでサーバーを起動
-app.listen(PORT, () => {
-  console.log('========================================');
-  console.log(`🚀 サーバー起動: http://localhost:${PORT}`);
-  console.log(`📝 環境: ${process.env.NODE_ENV || 'development'}`);
-  console.log('========================================');
-});
+// テスト時はサーバーを起動しない
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log('========================================');
+    console.log(`🚀 サーバー起動: http://localhost:${PORT}`);
+    console.log(`📝 環境: ${process.env.NODE_ENV || 'development'}`);
+    console.log('========================================');
+  });
+}
+
+// テスト用にエクスポート
+module.exports = app;
