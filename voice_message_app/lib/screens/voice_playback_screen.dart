@@ -7,18 +7,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
-import '../constants.dart';
+import '../services/message_service.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class VoicePlaybackScreen extends StatefulWidget {
-  final String voiceUrl;
-  final String fileName;
-  final VoiceTheme theme;
+  final MessageInfo message;
 
   const VoicePlaybackScreen({
     super.key,
-    required this.voiceUrl,
-    required this.fileName,
-    required this.theme,
+    required this.message,
   });
 
   @override
@@ -28,16 +26,54 @@ class VoicePlaybackScreen extends StatefulWidget {
 class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
+  bool _isLoading = true;
+  String? _error;
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
+  String? _localFilePath;
 
   @override
   void initState() {
     super.initState();
-    _initAudioPlayer();
+    _downloadAndPrepare();
+  }
+
+  // ========================================
+  // 音声ファイルをダウンロードして準備
+  // ========================================
+  Future<void> _downloadAndPrepare() async {
+    try {
+      // 一時ディレクトリを取得
+      final tempDir = await getTemporaryDirectory();
+      final savePath = '${tempDir.path}/${widget.message.id}.m4a';
+
+      // ファイルが既に存在するかチェック
+      final file = File(savePath);
+      if (!await file.exists()) {
+        // ダウンロード
+        await MessageService.downloadMessage(
+          messageId: widget.message.id,
+          savePath: savePath,
+        );
+      }
+
+      setState(() {
+        _localFilePath = savePath;
+        _isLoading = false;
+      });
+
+      _initAudioPlayer();
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _initAudioPlayer() async {
+    if (_localFilePath == null) return;
+
     // 再生状態の変更を監視
     _player.onPlayerStateChanged.listen((state) {
       if (mounted) {
@@ -84,10 +120,12 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
 
   // 再生・一時停止の切り替え
   Future<void> _togglePlay() async {
+    if (_localFilePath == null) return;
+
     if (_isPlaying) {
       await _player.pause();
     } else {
-      await _player.play(UrlSource(widget.voiceUrl));
+      await _player.play(DeviceFileSource(_localFilePath!));
     }
   }
 
@@ -108,38 +146,56 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // ========================================
-            // サムネイル（アイコン）
-            // ========================================
-            Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(
-                color: widget.theme.color.withOpacity(0.2),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: widget.theme.color,
-                  width: 4,
-                ),
-              ),
-              child: Icon(
-                widget.theme.icon,
-                size: 100,
-                color: widget.theme.color,
-              ),
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // ファイル名（タイトル）
-            Text(
-              widget.fileName,
-              style: const TextStyle(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('エラー: $_error'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('戻る'),
+                      ),
+                    ],
+                  ),
+                )
+              : Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // ========================================
+                      // 送信者アイコン
+                      // ========================================
+                      CircleAvatar(
+                        radius: 80,
+                        backgroundColor: Colors.deepPurple,
+                        backgroundImage: widget.message.senderProfileImage != null
+                            ? NetworkImage(widget.message.senderProfileImage!)
+                            : null,
+                        child: widget.message.senderProfileImage == null
+                            ? Text(
+                                widget.message.senderUsername[0].toUpperCase(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 48,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // 送信者名
+                      Text(
+                        widget.message.senderUsername,
+                        style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -155,7 +211,7 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
               min: 0,
               max: _duration.inSeconds.toDouble(),
               value: _position.inSeconds.toDouble().clamp(0, _duration.inSeconds.toDouble()),
-              activeColor: widget.theme.color,
+              activeColor: Colors.deepPurple,
               onChanged: (value) async {
                 final position = Duration(seconds: value.toInt());
                 await _player.seek(position);
@@ -183,7 +239,7 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
               iconSize: 80,
               icon: Icon(
                 _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                color: widget.theme.color,
+                color: Colors.deepPurple,
               ),
               onPressed: _togglePlay,
             ),

@@ -6,9 +6,9 @@
 // ボイスメッセージの一覧を表示するタブです
 
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
-import '../constants.dart';
+import '../services/message_service.dart';
 import 'voice_playback_screen.dart';
+import 'package:timeago/timeago.dart' as timeago;
 
 /// 受信ファイル一覧を表示するウィジェット
 class ReceivedFilesTab extends StatefulWidget {
@@ -20,64 +20,125 @@ class ReceivedFilesTab extends StatefulWidget {
 
 class _ReceivedFilesTabState extends State<ReceivedFilesTab> {
   // ========================================
-  // サンプルデータ（将来的にはサーバーから取得）
+  // 状態変数
   // ========================================
-  final List<Map<String, dynamic>> _receivedFiles = [
-    {
-      'filename': 'voice_001.m4a',
-      'sender': '山田太郎',
-      'date': '2024/12/22 14:30',
-      'duration': '0:15',
-      'isNew': true,
-    },
-    {
-      'filename': 'voice_002.m4a',
-      'sender': '佐藤花子',
-      'date': '2024/12/22 12:15',
-      'duration': '0:30',
-      'isNew': true,
-    },
-    {
-      'filename': 'voice_003.m4a',
-      'sender': '鈴木一郎',
-      'date': '2024/12/21 18:45',
-      'duration': '0:45',
-      'isNew': false,
-    },
-  ];
+  List<MessageInfo> _messages = [];
+  bool _isLoading = true;
+  String? _error;
 
   @override
-  void dispose() {
-    // _audioService.dispose(); // AudioServiceにdisposeがない場合があるため削除
-    super.dispose();
+  void initState() {
+    super.initState();
+    timeago.setLocaleMessages('ja', timeago.JaMessages());
+    _loadMessages();
   }
 
   // ========================================
-  // 音声を再生画面を開く
+  // 受信メッセージを読み込み
   // ========================================
-  void _openPlaybackScreen(Map<String, dynamic> file) {
-    final filename = file['filename'] as String;
-    
-    // ファイル名からテーマIDを抽出
-    // 例: theme_red_originalName.m4a
-    String themeId = 'blue'; // デフォルト
-    if (filename.startsWith('theme_')) {
-      final parts = filename.split('_');
-      if (parts.length >= 2) {
-        themeId = parts[1];
+  Future<void> _loadMessages() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final messages = await MessageService.getReceivedMessages();
+
+      setState(() {
+        _messages = messages;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ========================================
+  // メッセージを既読にする
+  // ========================================
+  Future<void> _markAsRead(MessageInfo message) async {
+    if (!message.isRead) {
+      try {
+        await MessageService.markAsRead(message.id);
+        // リストを再読み込み
+        _loadMessages();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('既読更新エラー: ${e.toString()}')),
+          );
+        }
       }
     }
+  }
+
+  // ========================================
+  // メッセージを削除
+  // ========================================
+  Future<void> _deleteMessage(MessageInfo message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('削除確認'),
+        content: const Text('このメッセージを削除してもよろしいですか？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await MessageService.deleteMessage(message.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('メッセージを削除しました')),
+          );
+        }
+        _loadMessages();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('削除エラー: ${e.toString()}')),
+          );
+        }
+      }
+    }
+  }
+
+  // ========================================
+  // 音声再生画面を開く
+  // ========================================
+  void _openPlaybackScreen(MessageInfo message) {
+    // 既読にする
+    _markAsRead(message);
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => VoicePlaybackScreen(
-          voiceUrl: ApiService.getVoiceUrl(filename),
-          fileName: file['sender'], // 送信者名を表示
-          theme: getThemeById(themeId),
+          message: message,
         ),
       ),
     );
+  }
+
+  // ========================================
+  // 時間表示をフォーマット
+  // ========================================
+  String _formatTime(DateTime dateTime) {
+    return timeago.format(dateTime, locale: 'ja');
   }
 
   @override
@@ -87,249 +148,189 @@ class _ReceivedFilesTabState extends State<ReceivedFilesTab> {
         title: const Text('受信メッセージ'),
         actions: [
           // ========================================
-          // フィルターボタン（将来の機能）
+          // 再読み込みボタン
           // ========================================
           IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: 'フィルター',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('フィルター'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CheckboxListTile(
-                        title: const Text('未読のみ'),
-                        value: false,
-                        onChanged: (value) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('フィルター機能は準備中です'),
-                            ),
-                          );
-                        },
-                      ),
-                      CheckboxListTile(
-                        title: const Text('本日の受信'),
-                        value: false,
-                        onChanged: (value) {
-                          Navigator.pop(context);
-                        },
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('閉じる'),
-                    ),
-                  ],
-                ),
-              );
-            },
+            icon: const Icon(Icons.refresh),
+            tooltip: '再読み込み',
+            onPressed: _loadMessages,
           ),
         ],
       ),
-      body: _receivedFiles.isEmpty
-          ? const Center(
-              child: Text('まだ受信メッセージがありません'),
-            )
-          : ListView.builder(
-              itemCount: _receivedFiles.length,
-              itemBuilder: (context, index) {
-                final file = _receivedFiles[index];
-
-                return Card(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('エラー: $_error'),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadMessages,
+                        child: const Text('再読み込み'),
+                      ),
+                    ],
                   ),
-                  child: ListTile(
-                    // ========================================
-                    // 送信者のアイコン
-                    // ========================================
-                    leading: Stack(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.blue,
-                          child: Text(
-                            file['sender'][0], // 名前の最初の文字
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        // 未読バッジ
-                        if (file['isNew'])
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                )
+              : _messages.isEmpty
+                  ? const Center(
+                      child: Text('受信メッセージがありません'),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadMessages,
+                      child: ListView.builder(
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          final message = _messages[index];
 
-                    // ========================================
-                    // ファイル情報
-                    // ========================================
-                    title: Row(
-                      children: [
-                        Text(
-                          file['sender'],
-                          style: TextStyle(
-                            fontWeight:
-                                file['isNew'] ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                        if (file['isNew']) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
+                          return Dismissible(
+                            key: Key(message.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
                               color: Colors.red,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Text(
-                              'NEW',
-                              style: TextStyle(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              child: const Icon(
+                                Icons.delete,
                                 color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              file['date'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.timer,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              file['duration'],
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    // ========================================
-                    // 再生ボタン（詳細画面へ）
-                    // ========================================
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.play_circle_fill,
-                            color: Colors.green,
-                            size: 32,
-                          ),
-                          onPressed: () => _openPlaybackScreen(file),
-                        ),
-                        // メニューボタン
-                        PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              showDialog(
+                            confirmDismiss: (direction) async {
+                              return await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: const Text('削除確認'),
-                                  content: const Text('このメッセージを削除しますか？'),
+                                  content: const Text(
+                                      'このメッセージを削除してもよろしいですか？'),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.pop(context),
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
                                       child: const Text('キャンセル'),
                                     ),
                                     TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        setState(() {
-                                          _receivedFiles.removeAt(index);
-                                        });
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text('削除しました'),
-                                          ),
-                                        );
-                                      },
-                                      child: const Text('削除'),
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('削除',
+                                          style: TextStyle(color: Colors.red)),
                                     ),
                                   ],
                                 ),
                               );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'download',
-                              child: Row(
+                            },
+                            onDismissed: (direction) async {
+                              await MessageService.deleteMessage(message.id);
+                              _loadMessages();
+                            },
+                            child: ListTile(
+                              // ========================================
+                              // 送信者アイコン
+                              // ========================================
+                              leading: Stack(
                                 children: [
-                                  Icon(Icons.download),
-                                  SizedBox(width: 8),
-                                  Text('ダウンロード'),
+                                  CircleAvatar(
+                                    backgroundColor: Colors.deepPurple,
+                                    backgroundImage:
+                                        message.senderProfileImage != null
+                                            ? NetworkImage(
+                                                message.senderProfileImage!)
+                                            : null,
+                                    child: message.senderProfileImage == null
+                                        ? Text(
+                                            message.senderUsername[0]
+                                                .toUpperCase(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  // 未読バッジ
+                                  if (!message.isRead)
+                                    Positioned(
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
+
+                              // ========================================
+                              // 送信者名・日時
+                              // ========================================
+                              title: Row(
                                 children: [
-                                  Icon(Icons.delete, color: Colors.red),
-                                  SizedBox(width: 8),
-                                  Text('削除'),
+                                  Text(
+                                    message.senderUsername,
+                                    style: TextStyle(
+                                      fontWeight: message.isRead
+                                          ? FontWeight.normal
+                                          : FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (!message.isRead)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        'NEW',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(_formatTime(message.sentAt)),
+                                  if (message.duration != null)
+                                    Text(
+                                      '長さ: ${message.duration}秒',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                ],
+                              ),
+
+                              // ========================================
+                              // 再生アイコン
+                              // ========================================
+                              trailing: IconButton(
+                                icon: const Icon(Icons.play_circle_filled),
+                                color: Colors.deepPurple,
+                                iconSize: 40,
+                                onPressed: () => _openPlaybackScreen(message),
+                              ),
+
+                              onTap: () => _openPlaybackScreen(message),
                             ),
-                          ],
-                        ),
-                      ],
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
     );
   }
 }

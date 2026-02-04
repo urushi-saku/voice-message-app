@@ -10,16 +10,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import '../services/audio_service.dart';
-import '../services/api_service.dart';
+import '../services/message_service.dart';
 
 /// 録音画面ウィジェット
 class RecordingScreen extends StatefulWidget {
-  /// 送信先のフォロワーのリスト
-  final List<String> recipients;
+  /// 送信先のユーザーIDリスト
+  final List<String> recipientIds;
 
   const RecordingScreen({
     super.key,
-    required this.recipients,
+    required this.recipientIds,
   });
 
   @override
@@ -152,6 +152,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
   // ========================================
   // ボイスメッセージを送信
   // ========================================
+  // ========================================
+  // ボイスメッセージを送信
+  // ========================================
   Future<void> _sendVoiceMessage() async {
     if (_recordedPath == null) return;
 
@@ -161,8 +164,11 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
     try {
       // サーバーに音声ファイルをアップロード
-      // TODO: 画像も一緒にアップロードする機能を追加
-      await ApiService.uploadVoice(_recordedPath!);
+      final messageId = await MessageService.sendMessage(
+        voiceFile: File(_recordedPath!),
+        receiverIds: widget.recipientIds,
+        duration: null, // TODO: 録音時間を計測して渡す
+      );
 
       if (!mounted) return;
 
@@ -170,7 +176,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${widget.recipients.join(', ')}に送信しました！',
+            '${widget.recipientIds.length}人に送信しました！',
           ),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 3),
