@@ -22,10 +22,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'register_screen.dart';
 
 /// ログイン画面ウィジェット
-/// 
+///
 /// 【StatefulWidget を使用】
 /// - ユーザーの入力値を保持
 /// - パスワード表示/非表示の切り替え状態を管理
@@ -45,14 +44,14 @@ class _LoginScreenState extends State<LoginScreen> {
   /// - _formKey.currentState!.validate() で全フィールドのバリデーション実行
   /// - エラーがあればfalse、なければtrueを返す
   final _formKey = GlobalKey<FormState>();
-  
+
   /// 【TextEditingController】
   /// 入力フィールドのテキスト値を管理
   /// - メール入力値: _emailController.text
   /// - パスワード入力値: _passwordController.text
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   /// パスワード表示フラグ（true=非表示, false=表示）
   bool _obscurePassword = true;
 

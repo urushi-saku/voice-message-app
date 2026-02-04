@@ -2,7 +2,7 @@
 // 認証サービス
 // ========================================
 // バックエンドのAPI通信を管理するサービス
-// 
+//
 // 【主な役割】
 // 1. ユーザー登録（POST /auth/register）
 // 2. ユーザーログイン（POST /auth/login）
@@ -22,7 +22,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 const String BASE_URL = 'http://localhost:3000';
 
 /// 認証サービスクラス
-/// 
+///
 /// 【static メソッド構成】
 /// - register(): 新規ユーザー登録
 /// - login(): ユーザーログイン
@@ -39,7 +39,7 @@ class AuthService {
   /// 3. レスポンスの JWT トークンを取得
   /// 4. トークンをshared_preferencesに保存
   /// 5. ユーザー情報を呼び出し元に返却
-  /// 
+  ///
   /// 【例外処理】
   /// - ステータスコード201以外 → エラーメッセージをthrow
   /// - 通信エラー → エラーをthrow

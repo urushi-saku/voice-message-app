@@ -16,18 +16,13 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('プロフィール'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('プロフィール'), elevation: 0),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           final user = authProvider.user;
 
           if (user == null) {
-            return const Center(
-              child: Text('ユーザー情報が見つかりません'),
-            );
+            return const Center(child: Text('ユーザー情報が見つかりません'));
           }
 
           return SingleChildScrollView(
@@ -74,10 +69,7 @@ class ProfilePage extends StatelessWidget {
                   // ========================================
                   Text(
                     user.email,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   ),
 
                   const SizedBox(height: 24),
@@ -89,10 +81,7 @@ class ProfilePage extends StatelessWidget {
                     Text(
                       user.bio,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -122,11 +111,7 @@ class ProfilePage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.grey[300],
-                      ),
+                      Container(width: 1, height: 40, color: Colors.grey[300]),
                       Column(
                         children: [
                           Text(
@@ -163,20 +148,19 @@ class ProfilePage extends StatelessWidget {
                           context: context,
                           builder: (BuildContext context) => AlertDialog(
                             title: const Text('ログアウト'),
-                            content:
-                                const Text('ログアウトしてもよろしいですか？'),
+                            content: const Text('ログアウトしてもよろしいですか？'),
                             actions: [
                               TextButton(
-                                onPressed: () =>
-                                    Navigator.of(context).pop(),
+                                onPressed: () => Navigator.of(context).pop(),
                                 child: const Text('キャンセル'),
                               ),
                               TextButton(
                                 onPressed: () {
                                   Navigator.of(context).pop();
                                   authProvider.logout().then((_) {
-                                    Navigator.of(context)
-                                        .pushReplacementNamed('/login');
+                                    Navigator.of(
+                                      context,
+                                    ).pushReplacementNamed('/login');
                                   });
                                 },
                                 child: const Text(
@@ -211,43 +195,6 @@ class ProfilePage extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-            const Text(
-              'user@example.com',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-            ),
-            
-            const SizedBox(height: 30),
-            
-            // ========================================
-            // プロフィール編集ボタン
-            // ========================================
-            ElevatedButton.icon(
-              icon: const Icon(Icons.edit),
-              label: const Text('プロフィール編集'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 30,
-                  vertical: 12,
-                ),
-              ),
-              onPressed: () {
-                // TODO: プロフィール編集機能は後で実装します
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('プロフィール編集機能は準備中です'),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

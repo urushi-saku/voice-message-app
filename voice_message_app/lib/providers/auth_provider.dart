@@ -2,7 +2,7 @@
 // 認証状態管理 Provider
 // ========================================
 // ログイン状態をアプリ全体で共有・管理するProvider
-// 
+//
 // 【主な役割】
 // 1. ユーザー情報の管理（ユーザー名、メール、フォロワー数など）
 // 2. 認証状態の管理（ログイン中か未ログインか）
@@ -73,11 +73,11 @@ class User {
 }
 
 /// 認証状態を管理するProvider
-/// 
+///
 /// 【ChangeNotifier を継承】
 /// - notifyListeners() で登録済みウィジェットを再描画
 /// - Consumer<AuthProvider> で画面がこのProviderを購読
-/// 
+///
 /// 【状態変数（プライベート）】
 /// - _user: ログイン中のユーザー情報
 /// - _token: JWT トークン（API通信で使用）
@@ -103,7 +103,7 @@ class AuthProvider extends ChangeNotifier {
   /// 【用途】
   /// UI層（画面）がこれらのゲッターを通じて状態を読み取る
   /// private変数(_user等)に直接アクセスできないようにするため
-  /// 
+  ///
   /// 【使用例】
   ///   final user = authProvider.user;
   ///   final isLoading = authProvider.isLoading;
@@ -119,7 +119,7 @@ class AuthProvider extends ChangeNotifier {
   /// 【実行タイミング】
   /// - AuthProvider が最初に生成される時（アプリ起動時）
   /// - MultiProvider で ChangeNotifierProvider(create: (_) => AuthProvider())
-  /// 
+  ///
   /// 【処理】
   /// - _initializeAuth() を呼び出して、保存トークンを確認
   AuthProvider() {

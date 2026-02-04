@@ -25,7 +25,7 @@ import 'screens/register_screen.dart';
 // ========================================
 /// 【main() 関数】
 /// アプリケーション実行時に最初に呼ばれる関数
-/// 
+///
 /// 【処理】
 /// runApp(const MyApp())でMyAppウィジェットを起動
 void main() {
@@ -70,7 +70,7 @@ class MyApp extends StatelessWidget {
         // ② 起動時に表示する画面 → AuthWrapper
         // AuthWrapperが認証状態を確認して適切な画面を表示
         home: const AuthWrapper(),
-        
+
         // ③ 名前付きルート（画面遷移時に使用）
         // Navigator.pushNamed('/login') のような形式で遷移可能
         routes: {
