@@ -3,8 +3,14 @@
 プロジェクト構成と実装ロードマップ
 ================================================================================
 
-更新日: 2026年2月3日
+更新日: 2026年2月4日
 プロジェクト根: /home/xiaox/voice-message-app
+
+【最新状況】
+フェーズ1（データベース連携＆認証）: 完了 ✅
+フェーズ2（フォロワー機能強化）: 完了 ✅
+フェーズ3（メッセージング機能強化）: 基本機能完了 ✅
+フェーズ4-7: 未着手
 
 
 ================================================================================
@@ -15,20 +21,37 @@ voice-message-app/
 ├── README.md                          # プロジェクト概要と実装機能説明
 ├── backend/                            # Node.js Expressバックエンド
 │   ├── app.js                         # メインサーバーファイル
-│   │   ├── ファイルアップロード機能（POST /upload）
-│   │   ├── ファイル一覧取得API（GET /voices）
-│   │   └── ファイルダウンロードAPI（GET /voice/:filename）
-│   ├── package.json                   # NPM設定（Express, Multer）
+│   │   ├── MongoDB Atlas接続
+│   │   ├── ルーティング設定（/auth, /users, /messages）
+│   │   └── CORS設定
+│   ├── package.json                   # NPM設定
+│   ├── models/                        # Mongooseモデル
+│   │   ├── User.js                   # ユーザーモデル
+│   │   ├── Follower.js               # フォロー関係モデル
+│   │   └── Message.js                # メッセージモデル
+│   ├── controllers/                   # ビジネスロジック
+│   │   ├── authController.js         # 認証処理
+│   │   ├── userController.js         # ユーザー管理
+│   │   └── messageController.js      # メッセージ処理
+│   ├── routes/                        # APIルーティング
+│   │   ├── auth.js                   # 認証API
+│   │   ├── user.js                   # ユーザーAPI
+│   │   └── message.js                # メッセージAPI
+│   ├── middleware/                    # ミドルウェア
+│   │   └── authMiddleware.js         # JWT認証
 │   └── uploads/                       # 音声ファイル保存ディレクトリ
 │
 └── voice_message_app/                 # Flutterモバイルアプリ
     ├── pubspec.yaml                   # Flutter依存パッケージ
     │   ├── record: ^5.1.2            # 音声録音
-    │   ├── audioplayers: ^6.1.0      # 音声再生
+    │   ├── audioplayers: ^6.0.0      # 音声再生
     │   ├── permission_handler: ^11.3.1 # 権限管理
     │   ├── http: ^1.2.1              # HTTP通信
     │   ├── path_provider: ^2.1.3     # ファイルパス取得
-    │   └── image_picker: ^0.8.7+2    # 画像選択
+    │   ├── image_picker: ^1.0.7      # 画像選択
+    │   ├── provider: ^6.1.5          # 状態管理
+    │   ├── shared_preferences: ^2.2.2 # ローカルストレージ
+    │   └── timeago: ^3.6.1           # 相対時間表示
     │
     ├── lib/                           # アプリケーションコード
     │   ├── main.dart                  # アプリエントリーポイント
@@ -38,54 +61,91 @@ voice-message-app/
     │   ├── constants.dart             # 定数定義
     │   │
     │   ├── screens/                   # UI画面
-    │   │   ├── home_page.dart        # ホーム画面（タブナビゲーション）
+    │   │   ├── home_page.dart        # ホーム画面（タブナビゲーション） ✅
     │   │   │   ├── ボイスメッセージタブ
     │   │   │   ├── フォロワータブ
     │   │   │   ├── 受信ファイルタブ
-    │   │   │   └── サーバーから音声一覧取得機能
+    │   │   │   └── プロフィールタブ
     │   │   │
-    │   │   ├── recording_screen.dart # 録音画面
+    │   │   ├── login_screen.dart     # ログイン画面 ✅
+    │   │   │   ├── JWT認証
+    │   │   │   └── トークン保存
+    │   │   │
+    │   │   ├── register_screen.dart  # 登録画面 ✅
+    │   │   │   └── ユーザー登録処理
+    │   │   │
+    │   │   ├── recording_screen.dart # 録音画面 ✅
     │   │   │   ├── 音声録音UI
-    │   │   │   ├── 複数フォロワー選択
-    │   │   │   ├── 画像添付機能
-    │   │   │   └── ファイル送信機能
+    │   │   │   ├── MessageService統合
+    │   │   │   └── 複数受信者への送信
     │   │   │
-    │   │   ├── select_follower_screen.dart # フォロワー選択画面
-    │   │   │   └── 複数フォロワー選択UI
+    │   │   ├── select_follower_screen.dart # フォロワー選択画面 ✅
+    │   │   │   ├── API連携フォロー一覧
+    │   │   │   ├── 複数選択機能
+    │   │   │   └── 受信者ID渡し
     │   │   │
-    │   │   ├── followers_tab.dart   # フォロワー一覧タブ
-    │   │   │   ├── フォロワーリスト表示
-    │   │   │   ├── フォロワー詳細情報表示
-    │   │   │   └── メッセージ送信起点
+    │   │   ├── followers_tab.dart   # フォロワー一覧タブ ✅
+    │   │   │   ├── Followers/Followingタブ
+    │   │   │   ├── ユーザー検索機能
+    │   │   │   ├── フォロー/アンフォローボタン
+    │   │   │   └── プルダウン更新
     │   │   │
-    │   │   ├── received_files_tab.dart # 受信メッセージタブ
-    │   │   │   ├── 受信メッセージ一覧
-    │   │   │   ├── 送信者情報表示
-    │   │   │   ├── 受信日時表示
-    │   │   │   └── 再生機能へのリンク
+    │   │   ├── received_files_tab.dart # 受信メッセージタブ ✅
+    │   │   │   ├── MessageInfo一覧表示
+    │   │   │   ├── 既読/未読管理
+    │   │   │   ├── timeago時間表示
+    │   │   │   ├── スワイプ削除
+    │   │   │   └── 既読マーク機能
     │   │   │
-    │   │   ├── voice_playback_screen.dart # 音声再生画面
-    │   │   │   ├── 音声再生コントロール
-    │   │   │   ├── 再生時間表示
-    │   │   │   └── メッセージ情報表示
+    │   │   ├── voice_playback_screen.dart # 音声再生画面 ✅
+    │   │   │   ├── ファイルダウンロード
+    │   │   │   ├── ローカル再生
+    │   │   │   ├── ローディング/エラー表示
+    │   │   │   └── 送信者情報表示
     │   │   │
-    │   │   └── profile_page.dart    # プロフィール画面
+    │   │   └── profile_page.dart    # プロフィール画面 ✅
     │   │       ├── ユーザー情報表示
+    │   │       ├── ログアウト機能
     │   │       └── アプリ情報表示
     │   │
-    │   └── services/                 # ビジネスロジック層
-    │       ├── audio_service.dart    # 音声録音・再生管理
-    │       │   ├── startRecording()   # 録音開始
-    │       │   ├── stopRecording()    # 録音停止
-    │       │   ├── playAudio()        # 音声再生
-    │       │   ├── pausePlayback()    # 再生一時停止
-    │       │   └── dispose()          # リソース解放
-    │       │
-    │       └── api_service.dart      # サーバー通信管理
-    │           ├── uploadVoice()      # 音声ファイルアップロード
-    │           ├── fetchVoices()      # 音声一覧取得
-    │           ├── downloadVoice()    # 音声ダウンロード
-    │           └── sendToFollowers()  # フォロワーへ送信
+    │   ├── services/                 # ビジネスロジック層 ✅
+    │   │   ├── audio_service.dart    # 音声録音・再生管理 ✅
+    │   │   │   ├── startRecording()   # 録音開始
+    │   │   │   ├── stopRecording()    # 録音停止
+    │   │   │   ├── playAudio()        # 音声再生
+    │   │   │   ├── pausePlayback()    # 再生一時停止
+    │   │   │   └── dispose()          # リソース解放
+    │   │   │
+    │   │   ├── auth_service.dart     # 認証サービス ✅
+    │   │   │   ├── register()         # ユーザー登録
+    │   │   │   ├── login()            # ログイン
+    │   │   │   ├── getToken()         # トークン取得
+    │   │   │   ├── saveToken()        # トークン保存
+    │   │   │   ├── logout()           # ログアウト
+    │   │   │   └── getMe()            # 現在のユーザー情報取得
+    │   │   │
+    │   │   ├── user_service.dart     # ユーザー管理サービス ✅
+    │   │   │   ├── UserInfoクラス
+    │   │   │   ├── searchUsers()      # ユーザー検索
+    │   │   │   ├── getUserById()      # ユーザー詳細
+    │   │   │   ├── followUser()       # フォロー
+    │   │   │   ├── unfollowUser()     # アンフォロー
+    │   │   │   ├── getFollowers()     # フォロワー一覧
+    │   │   │   └── getFollowing()     # フォロー中一覧
+    │   │   │
+    │   │   ├── message_service.dart  # メッセージサービス ✅
+    │   │   │   ├── MessageInfoクラス
+    │   │   │   ├── sendMessage()      # メッセージ送信
+    │   │   │   ├── getReceivedMessages() # 受信一覧
+    │   │   │   ├── getSentMessages()  # 送信一覧
+    │   │   │   ├── markAsRead()       # 既読マーク
+    │   │   │   ├── deleteMessage()    # メッセージ削除
+    │   │   │   └── downloadMessage()  # ファイルダウンロード
+    │   │   │
+    │   │   └── api_service.dart      # サーバー通信管理（旧バージョン）
+    │   │
+    │   └── providers/                # 状態管理 ✅
+    │       └── auth_provider.dart    # 認証状態管理
     │
     ├── test/                         # テストコード
     │   └── widget_test.dart          # ウィジェットテスト
@@ -106,137 +166,165 @@ voice-message-app/
 ✅ 基本的なUIフレームワーク（タブナビゲーション）
 ✅ 音声録音機能（マイク権限管理含む）
 ✅ 音声再生機能
-✅ フォロワー一覧表示
+✅ ユーザー認証（ログイン/登録）
+✅ JWT トークン管理
+✅ 認証状態管理（Provider）
+✅ ユーザー検索機能
+✅ フォロー/アンフォロー機能
+✅ フォロワー/フォロー中一覧表示
+✅ 複数フォロワー選択UI
+✅ 音声メッセージ送信（複数受信者）
 ✅ 受信メッセージ一覧表示
-✅ メッセージ送信UI
+✅ 既読/未読管理
+✅ メッセージ削除機能（スワイプ）
+✅ 相対時間表示（timeago）
+✅ ファイルダウンロード＆ローカル再生
 ✅ プロフィール画面
-✅ 画像選択機能
+✅ ログアウト機能
 ✅ リアルタイム再生時間表示
+✅ ローディング/エラー状態管理
 
-【バックエンド：Node.js Express】
-✅ ファイルアップロードAPI（POST /upload）
-✅ ファイル一覧取得API（GET /voices）
-✅ ファイルダウンロードAPI（GET /voice/:filename）
-✅ Multerを使用したファイル管理
-✅ 基本的なエラーハンドリング
+【バックエンド：Node.js Express + MongoDB】
+✅ MongoDB Atlas接続
+✅ ユーザー認証API（登録/ログイン/ログアウト）
+✅ JWT トークン認証
+✅ bcrypt パスワード暗号化
+✅ ユーザー検索API（GET /users/search）
+✅ フォロー/アンフォローAPI（POST/DELETE /users/:id/follow）
+✅ フォロワー/フォロー中一覧API（GET /users/:id/followers, /users/:id/following）
+✅ メッセージ送信API（POST /messages/send）
+✅ メッセージ受信一覧API（GET /messages/received）
+✅ メッセージ送信一覧API（GET /messages/sent）
+✅ 既読マークAPI（PUT /messages/:id/read）
+✅ メッセージ削除API（DELETE /messages/:id）
+✅ ファイルダウンロードAPI（GET /messages/:id/download）
+✅ Multerを使用したファイルアップロード（10MB制限）
+✅ 認証ミドルウェア（protect）
+✅ エラーハンドリング
+✅ CORS設定
+
+【データベース：MongoDB】
+✅ User モデル（username, email, password, profileImage, bio, フォロワー数）
+✅ Follower モデル（user, follower, followedAt）
+✅ Message モデル（sender, receivers, filePath, duration, readStatus, sentAt）
 
 
 ================================================================================
 3. 今後の実装予定内容
 ================================================================================
 
-【フェーズ1：データベース連携（優先度：高）】
+【フェーズ1：データベース連携（優先度：高）】✅ 完了
 ┌─────────────────────────────────────────────────────────────────
-├── 3.1 ユーザー認証機能
-│   ├── ユーザー登録API
-│   ├── ログイン機能
-│   ├── JWTトークン認証
-│   ├── パスワード暗号化
-│   └── セッション管理
+├── 3.1 ユーザー認証機能 ✅
+│   ├── ✅ ユーザー登録API
+│   ├── ✅ ログイン機能
+│   ├── ✅ JWTトークン認証
+│   ├── ✅ パスワード暗号化（bcrypt）
+│   └── ✅ トークン管理（shared_preferences）
 │
-├── 3.2 データベース設計・実装
-│   ├── MongoDBまたはPostgreSQL導入
-│   ├── ユーザーテーブル
-│   │   ├── user_id（主キー）
-│   │   ├── username
-│   │   ├── email
-│   │   ├── password_hash
-│   │   ├── profile_image
+├── 3.2 データベース設計・実装 ✅
+│   ├── ✅ MongoDB Atlas導入
+│   ├── ✅ Userモデル
+│   │   ├── username（ユニーク）
+│   │   ├── email（ユニーク）
+│   │   ├── password（ハッシュ化）
+│   │   ├── profileImage
 │   │   ├── bio
-│   │   └── created_at
+│   │   ├── followersCount
+│   │   └── followingCount
 │   │
-│   ├── フォロワー関係テーブル
-│   │   ├── follower_id（主キー）
-│   │   ├── user_id
-│   │   ├── follower_user_id
-│   │   └── follow_date
+│   ├── ✅ Followerモデル
+│   │   ├── user（参照）
+│   │   ├── follower（参照）
+│   │   ├── followedAt
+│   │   └── 複合インデックス（user + follower）
 │   │
-│   ├── メッセージテーブル
-│   │   ├── message_id（主キー）
-│   │   ├── sender_id
-│   │   ├── receiver_id
-│   │   ├── file_path
-│   │   ├── file_size
-│   │   ├── duration
-│   │   ├── sent_at
-│   │   ├── read_at
-│   │   └── transcript（音声テキスト化用）
-│   │
-│   └── ファイルメタデータテーブル
-│       ├── file_id（主キー）
-│       ├── original_filename
-│       ├── stored_filename
-│       ├── file_size
-│       ├── mime_type
-│       ├── upload_user_id
-│       └── uploaded_at
+│   └── ✅ Messageモデル
+│       ├── sender（参照）
+│       ├── receivers（配列、参照）
+│       ├── filePath
+│       ├── fileSize
+│       ├── duration
+│       ├── mimeType
+│       ├── readStatus（配列：user, isRead, readAt）
+│       ├── sentAt
+│       └── isDeleted（論理削除）
 │
-├── 3.3 フロントエンド：認証画面の実装
-│   ├── ログイン画面
-│   ├── 登録画面
-│   ├── パスワードリセット画面
-│   └── 認証状態の管理（Provider/Riverpod）
+├── 3.3 フロントエンド：認証画面の実装 ✅
+│   ├── ✅ ログイン画面
+│   ├── ✅ 登録画面
+│   ├── ✅ 認証状態の管理（Provider）
+│   └── ⏳ パスワードリセット画面（未実装）
 │
-└── 3.4 バックエンド：認証APIの実装
-    ├── /auth/register - ユーザー登録
-    ├── /auth/login - ログイン
-    ├── /auth/refresh - トークンリフレッシュ
-    └── /auth/logout - ログアウト
+└── 3.4 バックエンド：認証APIの実装 ✅
+    ├── ✅ POST /auth/register - ユーザー登録
+    ├── ✅ POST /auth/login - ログイン
+    ├── ✅ GET /auth/me - ユーザー情報取得
+    └── ⏳ POST /auth/refresh - トークンリフレッシュ（未実装）
 
-【フェーズ2：フォロワー機能強化（優先度：高）】
+【フェーズ2：フォロワー機能強化（優先度：高）】✅ 完了
 ┌─────────────────────────────────────────────────────────────────
-├── 4.1 ユーザー検索機能
-│   ├── ユーザー検索API（GET /users/search）
-│   ├── フロントエンド検索UI
-│   └── 検索結果表示
+├── 4.1 ユーザー検索機能 ✅
+│   ├── ✅ ユーザー検索API（GET /users/search）
+│   ├── ✅ フロントエンド検索UI（UserSearchScreen）
+│   ├── ✅ デバウンス機能（500ms）
+│   └── ✅ 検索結果表示
 │
-├── 4.2 フォロー/フォロー解除機能
-│   ├── フォロー処理API（POST /users/:id/follow）
-│   ├── フォロー解除API（DELETE /users/:id/follow）
-│   ├── フォロワー一覧API（GET /users/:id/followers）
-│   ├── フォロー中一覧API（GET /users/:id/following）
-│   └── フロントエンド画面更新
+├── 4.2 フォロー/フォロー解除機能 ✅
+│   ├── ✅ フォロー処理API（POST /users/:id/follow）
+│   ├── ✅ フォロー解除API（DELETE /users/:id/follow）
+│   ├── ✅ フォロワー一覧API（GET /users/:id/followers）
+│   ├── ✅ フォロー中一覧API（GET /users/:id/following）
+│   ├── ✅ フロントエンド画面更新（followers_tab.dart）
+│   ├── ✅ 自動フォロワー数カウント更新
+│   └── ✅ 重複フォロー防止
 │
-├── 4.3 ユーザープロフィール機能
-│   ├── プロフィール編集機能
-│   ├── プロフィール画像アップロード
-│   ├── 自己紹介編集
-│   └── プロフィール表示画面の改善
+├── 4.3 ユーザープロフィール機能 ⏳ 部分実装
+│   ├── ✅ プロフィール表示画面
+│   ├── ⏳ プロフィール編集機能（未実装）
+│   ├── ⏳ プロフィール画像アップロード（未実装）
+│   └── ⏳ 自己紹介編集（未実装）
 │
-└── 4.4 提案機能
-    ├── おすすめユーザー表示
-    └── 相互フォロー提案
+└── 4.4 提案機能 ⏳ 未実装
+    ├── ⏳ おすすめユーザー表示
+    └── ⏳ 相互フォロー提案
 
-【フェーズ3：メッセージング機能強化（優先度：中）】
+【フェーズ3：メッセージング機能強化（優先度：中）】✅ 基本機能完了
 ┌─────────────────────────────────────────────────────────────────
-├── 5.1 メッセージ既読機能
-│   ├── 既読状態の管理
-│   ├── 既読日時の記録
-│   ├── 既読状態の表示（UI）
-│   └── 既読状態の通知
+├── 5.1 メッセージ既読機能 ✅
+│   ├── ✅ 既読状態の管理（readStatus配列）
+│   ├── ✅ 既読日時の記録
+│   ├── ✅ 既読状態の表示（UI）
+│   ├── ✅ 既読マークAPI（PUT /messages/:id/read）
+│   ├── ✅ 再生時自動既読マーク
+│   └── ⏳ 既読通知（未実装）
 │
-├── 5.2 メッセージ削除機能
-│   ├── メッセージ削除API（DELETE /messages/:id）
-│   ├── ローカルファイル削除
-│   ├── UIから削除オプション表示
-│   └── 削除確認ダイアログ
+├── 5.2 メッセージ削除機能 ✅
+│   ├── ✅ メッセージ削除API（DELETE /messages/:id）
+│   ├── ✅ 論理削除（isDeletedフラグ）
+│   ├── ✅ スワイプで削除UI
+│   ├── ✅ 削除確認ダイアログ
+│   └── ⏳ ローカルファイル物理削除（未実装）
 │
-├── 5.3 複数メッセージ管理
-│   ├── メッセージをグループ化
-│   ├── スレッド機能
-│   └── メッセージ検索機能
+├── 5.3 複数メッセージ管理 ✅ 基本実装
+│   ├── ✅ メッセージ一覧表示
+│   ├── ✅ 送信者別表示
+│   ├── ✅ 時間順ソート
+│   ├── ⏳ メッセージグループ化（未実装）
+│   ├── ⏳ スレッド機能（未実装）
+│   └── ⏳ メッセージ検索機能（未実装）
 │
-├── 5.4 音声テキスト化（Speech-to-Text）
-│   ├── Google Cloud Speech-to-Text API連携
-│   ├── バックエンド処理
-│   ├── テキスト保存
-│   └── メッセージに表示
+├── 5.4 音声テキスト化（Speech-to-Text） ⏳ 未実装
+│   ├── ⏳ Google Cloud Speech-to-Text API連携
+│   ├── ⏳ バックエンド処理
+│   ├── ⏳ テキスト保存
+│   └── ⏳ メッセージに表示
 │
-└── 5.5 メッセージ通知機能
-    ├── Firebase Cloud Messaging（FCM）導入
-    ├── プッシュ通知送信
-    ├── 通知設定画面
-    └── バックグラウンド処理
+└── 5.5 メッセージ通知機能 ⏳ 未実装
+    ├── ⏳ Firebase Cloud Messaging（FCM）導入
+    ├── ⏳ プッシュ通知送信
+    ├── ⏳ 通知設定画面
+    └── ⏳ バックグラウンド処理
 
 【フェーズ4：高度な機能（優先度：中）】
 ┌─────────────────────────────────────────────────────────────────
@@ -367,25 +455,36 @@ voice-message-app/
 4. 開発優先順位（推奨される実装順序）
 ================================================================================
 
-1位：フェーズ1（データベース＆ユーザー認証）
+1位：✅ フェーズ1（データベース＆ユーザー認証）
+   └─ 状態：完了
    └─ 理由：すべての機能の基盤となるため
 
-2位：フェーズ2（フォロワー機能強化）
+2位：✅ フェーズ2（フォロワー機能強化）
+   └─ 状態：完了
    └─ 理由：ユーザー認証の後に必須
 
-3位：フェーズ3（メッセージング機能強化）
+3位：✅ フェーズ3（メッセージング機能強化）
+   └─ 状態：基本機能完了、追加機能は未実装
    └─ 理由：コア機能の完成度向上
 
-4位：フェーズ7（テスト・デプロイメント）
+4位：⏳ フェーズ7（テスト・デプロイメント）← 【次の優先事項】
+   └─ 状態：未着手
    └─ 理由：本番環境リリースに必要
 
-5位：フェーズ4（高度な機能）
+5位：⏳ フェーズ3の残り機能（通知、STT、検索）
+   └─ 状態：未実装
+   └─ 理由：ユーザー体験の向上
+
+6位：⏳ フェーズ4（高度な機能）
+   └─ 状態：未着手
    └─ 理由：差別化機能の追加
 
-6位：フェーズ5（セキュリティ・パフォーマンス）
+7位：⏳ フェーズ5（セキュリティ・パフォーマンス）
+   └─ 状態：未着手
    └─ 理由：ユーザー増加時に重要化
 
-7位：フェーズ6（UI/UX改善）
+8位：⏳ フェーズ6（UI/UX改善）
+   └─ 状態：未着手
    └─ 理由：機能完成後の改善
 
 
@@ -429,45 +528,48 @@ voice-message-app/
 ================================================================================
 
 【認証API】
-POST   /auth/register          - ユーザー登録
-POST   /auth/login             - ログイン
-POST   /auth/logout            - ログアウト
-POST   /auth/refresh           - トークンリフレッシュ
-POST   /auth/reset-password    - パスワードリセット
+✅ POST   /auth/register          - ユーザー登録
+✅ POST   /auth/login             - ログイン
+✅ GET    /auth/me                - 現在のユーザー情報
+⏳ POST   /auth/logout            - ログアウト（未実装）
+⏳ POST   /auth/refresh           - トークンリフレッシュ（未実装）
+⏳ POST   /auth/reset-password    - パスワードリセット（未実装）
 
 【ユーザーAPI】
-GET    /users                  - ユーザー一覧
-GET    /users/search           - ユーザー検索
-GET    /users/:id              - ユーザー詳細
-PUT    /users/:id              - プロフィール更新
-DELETE /users/:id              - アカウント削除
-GET    /users/:id/followers    - フォロワー一覧
-GET    /users/:id/following    - フォロー中一覧
+✅ GET    /users/search           - ユーザー検索（クエリパラメータ：q）
+✅ GET    /users/:id              - ユーザー詳細
+✅ GET    /users/:id/followers    - フォロワー一覧
+✅ GET    /users/:id/following    - フォロー中一覧
+⏳ GET    /users                  - ユーザー一覧（未実装）
+⏳ PUT    /users/:id              - プロフィール更新（未実装）
+⏳ DELETE /users/:id              - アカウント削除（未実装）
 
 【フォロー関連API】
-POST   /users/:id/follow       - フォロー
-DELETE /users/:id/follow       - フォロー解除
-GET    /users/:id/suggestions  - 提案ユーザー
+✅ POST   /users/:id/follow       - フォロー
+✅ DELETE /users/:id/follow       - フォロー解除
+⏳ GET    /users/:id/suggestions  - 提案ユーザー（未実装）
 
 【メッセージAPI】
-POST   /messages                - メッセージ送信
-GET    /messages                - メッセージ一覧
-GET    /messages/:id            - メッセージ詳細
-DELETE /messages/:id            - メッセージ削除
-PUT    /messages/:id/read       - 既読マーク
-GET    /messages/search         - メッセージ検索
+✅ POST   /messages/send          - メッセージ送信（multipart/form-data）
+✅ GET    /messages/received      - 受信メッセージ一覧
+✅ GET    /messages/sent          - 送信メッセージ一覧
+✅ PUT    /messages/:id/read      - 既読マーク
+✅ DELETE /messages/:id            - メッセージ削除（論理削除）
+✅ GET    /messages/:id/download  - ファイルダウンロード
+⏳ GET    /messages/:id            - メッセージ詳細（未実装）
+⏳ GET    /messages/search         - メッセージ検索（未実装）
+⏳ POST   /messages/:id/transcribe - 音声テキスト化（未実装）
 
-【ファイルAPI】
-POST   /upload                  - ファイルアップロード
-GET    /voices                  - ファイル一覧
-GET    /voice/:filename         - ファイルダウンロード
-DELETE /voice/:filename         - ファイル削除
-POST   /voice/:id/transcribe    - 音声テキスト化
+【ファイルAPI（旧バージョン、非推奨）】
+⚠️  POST   /upload                  - ファイルアップロード（/messages/sendを使用）
+⚠️  GET    /voices                  - ファイル一覧（/messages/*を使用）
+⚠️  GET    /voice/:filename         - ファイルダウンロード（/messages/:id/downloadを使用）
+⏳ DELETE /voice/:filename         - ファイル削除（未実装）
 
 【通知API】
-POST   /notifications           - 通知送信
-GET    /notifications           - 通知一覧
-DELETE /notifications/:id       - 通知削除
+⏳ POST   /notifications           - 通知送信（未実装）
+⏳ GET    /notifications           - 通知一覧（未実装）
+⏳ DELETE /notifications/:id       - 通知削除（未実装）
 
 
 ================================================================================
@@ -502,6 +604,16 @@ DELETE /notifications/:id       - 通知削除
 ================================================================================
 8. 更新履歴
 ================================================================================
+
+2026-02-04: 大幅更新（フェーズ1-3完了）
+  - フェーズ1（データベース連携＆認証）完了
+  - フェーズ2（フォロワー機能強化）完了
+  - フェーズ3（メッセージング基本機能）完了
+  - 実装済み機能の詳細追記
+  - API一覧の実装状況更新
+  - バックエンドファイル構成の詳細追加
+  - Flutterサービス層の詳細追加
+  - 次の優先事項を明確化（テスト・デプロイメント）
 
 2026-02-03: 初版作成
   - プロジェクト構成の整理

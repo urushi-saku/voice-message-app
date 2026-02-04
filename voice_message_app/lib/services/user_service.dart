@@ -65,9 +65,7 @@ class UserService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/users/search?q=$keyword'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -92,9 +90,7 @@ class UserService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/users/$userId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -157,9 +153,7 @@ class UserService {
 
     final response = await http.delete(
       Uri.parse('$BASE_URL/users/$userId/follow'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode != 200) {
@@ -181,9 +175,7 @@ class UserService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/users/$userId/followers'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -208,9 +200,7 @@ class UserService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/users/$userId/following'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {

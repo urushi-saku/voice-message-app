@@ -17,10 +17,7 @@ class RecordingScreen extends StatefulWidget {
   /// 送信先のユーザーIDリスト
   final List<String> recipientIds;
 
-  const RecordingScreen({
-    super.key,
-    required this.recipientIds,
-  });
+  const RecordingScreen({super.key, required this.recipientIds});
 
   @override
   State<RecordingScreen> createState() => _RecordingScreenState();
@@ -57,9 +54,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('画像選択エラー: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('画像選択エラー: $e')));
     }
   }
 
@@ -74,13 +71,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
         _hasRecording = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('録音を開始しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('録音を開始しました')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('録音開始エラー: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('録音開始エラー: $e')));
     }
   }
 
@@ -96,13 +93,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
         _recordedPath = path;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('録音を停止しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('録音を停止しました')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('録音停止エラー: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('録音停止エラー: $e')));
     }
   }
 
@@ -127,9 +124,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
       setState(() {
         _isPlaying = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('再生エラー: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('再生エラー: $e')));
     }
   }
 
@@ -143,9 +140,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
         _isPlaying = false;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('停止エラー: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('停止エラー: $e')));
     }
   }
 
@@ -175,9 +172,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       // 送信成功
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '${widget.recipientIds.length}人に送信しました！',
-          ),
+          content: Text('${widget.recipientIds.length}人に送信しました！'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 3),
         ),
@@ -194,10 +189,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('送信エラー: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('送信エラー: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -205,9 +197,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ボイスメッセージを録音'),
-      ),
+      appBar: AppBar(title: const Text('ボイスメッセージを録音')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -302,11 +292,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                 children: [
                   // 録音中のアニメーション
                   if (_isRecording)
-                    const Icon(
-                      Icons.mic,
-                      size: 100,
-                      color: Colors.red,
-                    ),
+                    const Icon(Icons.mic, size: 100, color: Colors.red),
                   // 録音済みの表示（サムネイルまたはアイコン）
                   if (_hasRecording && !_isRecording)
                     Container(
@@ -349,11 +335,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                     ),
                   // 初期状態のアイコン
                   if (!_isRecording && !_hasRecording)
-                    Icon(
-                      Icons.mic_none,
-                      size: 100,
-                      color: Colors.grey[400],
-                    ),
+                    Icon(Icons.mic_none, size: 100, color: Colors.grey[400]),
 
                   const SizedBox(height: 16),
 
@@ -362,8 +344,8 @@ class _RecordingScreenState extends State<RecordingScreen> {
                     _isRecording
                         ? '録音中...'
                         : _hasRecording
-                            ? '録音完了'
-                            : '録音ボタンを押して開始',
+                        ? '録音完了'
+                        : '録音ボタンを押して開始',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -434,8 +416,9 @@ class _RecordingScreenState extends State<RecordingScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : const Icon(Icons.send),

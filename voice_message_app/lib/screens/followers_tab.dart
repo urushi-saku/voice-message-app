@@ -77,9 +77,7 @@ class _FollowersTabState extends State<FollowersTab> {
   void _openSearch() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const UserSearchScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const UserSearchScreen()),
     ).then((_) => _loadFollowers()); // 戻ってきたらリロード
   }
 
@@ -89,9 +87,7 @@ class _FollowersTabState extends State<FollowersTab> {
   void _openSendVoiceMessage() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SelectFollowerScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const SelectFollowerScreen()),
     );
   }
 
@@ -127,25 +123,25 @@ class _FollowersTabState extends State<FollowersTab> {
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('エラー: $_error'),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadFollowers,
-                          child: const Text('再読み込み'),
-                        ),
-                      ],
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('エラー: $_error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadFollowers,
+                      child: const Text('再読み込み'),
                     ),
-                  )
-                : TabBarView(
-                    children: [
-                      _buildFollowerList(_followers),
-                      _buildFollowerList(_following),
-                    ],
-                  ),
+                  ],
+                ),
+              )
+            : TabBarView(
+                children: [
+                  _buildFollowerList(_followers),
+                  _buildFollowerList(_following),
+                ],
+              ),
       ),
     );
   }
@@ -155,9 +151,7 @@ class _FollowersTabState extends State<FollowersTab> {
   // ========================================
   Widget _buildFollowerList(List<UserInfo> users) {
     if (users.isEmpty) {
-      return const Center(
-        child: Text('ユーザーがいません'),
-      );
+      return const Center(child: Text('ユーザーがいません'));
     }
 
     return RefreshIndicator(
@@ -196,10 +190,7 @@ class _FollowersTabState extends State<FollowersTab> {
               children: [
                 Text(
                   user.email,
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
                 if (user.bio.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -303,18 +294,18 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
       } else {
         await UserService.followUser(user.id);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${user.username}をフォローしました')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('${user.username}をフォローしました')));
         }
       }
       // 再検索して状態を更新
       _searchUsers(_searchController.text);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('エラー: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('エラー: ${e.toString()}')));
       }
     }
   }
@@ -322,9 +313,7 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ユーザー検索'),
-      ),
+      appBar: AppBar(title: const Text('ユーザー検索')),
       body: Column(
         children: [
           // ========================================
@@ -370,53 +359,49 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
             child: _isSearching
                 ? const Center(child: CircularProgressIndicator())
                 : _error != null
-                    ? Center(child: Text('エラー: $_error'))
-                    : _searchResults.isEmpty
-                        ? const Center(
-                            child: Text('ユーザーが見つかりません'),
-                          )
-                        : ListView.builder(
-                            itemCount: _searchResults.length,
-                            itemBuilder: (context, index) {
-                              final user = _searchResults[index];
-                              // TODO: フォロー状態を確認する実装が必要
-                              final isFollowing = false;
+                ? Center(child: Text('エラー: $_error'))
+                : _searchResults.isEmpty
+                ? const Center(child: Text('ユーザーが見つかりません'))
+                : ListView.builder(
+                    itemCount: _searchResults.length,
+                    itemBuilder: (context, index) {
+                      final user = _searchResults[index];
+                      // TODO: フォロー状態を確認する実装が必要
+                      final isFollowing = false;
 
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Colors.deepPurple,
-                                  backgroundImage: user.profileImage != null
-                                      ? NetworkImage(user.profileImage!)
-                                      : null,
-                                  child: user.profileImage == null
-                                      ? Text(
-                                          user.username[0].toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                title: Text(user.username),
-                                subtitle: Text(user.email),
-                                trailing: ElevatedButton(
-                                  onPressed: () =>
-                                      _toggleFollow(user, isFollowing),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: isFollowing
-                                        ? Colors.grey
-                                        : Colors.deepPurple,
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.deepPurple,
+                          backgroundImage: user.profileImage != null
+                              ? NetworkImage(user.profileImage!)
+                              : null,
+                          child: user.profileImage == null
+                              ? Text(
+                                  user.username[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  child: Text(
-                                    isFollowing ? 'フォロー中' : 'フォロー',
-                                    style:
-                                        const TextStyle(color: Colors.white),
-                                  ),
-                                ),
-                              );
-                            },
+                                )
+                              : null,
+                        ),
+                        title: Text(user.username),
+                        subtitle: Text(user.email),
+                        trailing: ElevatedButton(
+                          onPressed: () => _toggleFollow(user, isFollowing),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isFollowing
+                                ? Colors.grey
+                                : Colors.deepPurple,
                           ),
+                          child: Text(
+                            isFollowing ? 'フォロー中' : 'フォロー',
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),

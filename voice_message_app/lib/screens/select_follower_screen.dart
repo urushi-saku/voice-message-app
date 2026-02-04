@@ -97,9 +97,9 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
   // ========================================
   void _confirmSelection() {
     if (_selectedUserIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('送信先を選択してください')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('送信先を選択してください')));
       return;
     }
 
@@ -107,9 +107,8 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RecordingScreen(
-          recipientIds: _selectedUserIds.toList(),
-        ),
+        builder: (context) =>
+            RecordingScreen(recipientIds: _selectedUserIds.toList()),
       ),
     );
   }
@@ -133,7 +132,9 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
                   ? Icons.check_box
                   : Icons.check_box_outline_blank,
             ),
-            tooltip: _selectedUserIds.length == _following.length ? '全解除' : '全選択',
+            tooltip: _selectedUserIds.length == _following.length
+                ? '全解除'
+                : '全選択',
             onPressed: _toggleAllSelection,
           ),
         ],
@@ -141,85 +142,82 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('エラー: $_error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadFollowing,
-                        child: const Text('再読み込み'),
-                      ),
-                    ],
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('エラー: $_error'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _loadFollowing,
+                    child: const Text('再読み込み'),
                   ),
-                )
-              : _following.isEmpty
-                  ? const Center(
-                      child: Text('フォロー中のユーザーがいません'),
-                    )
-                  : Column(
+                ],
+              ),
+            )
+          : _following.isEmpty
+          ? const Center(child: Text('フォロー中のユーザーがいません'))
+          : Column(
+              children: [
+                // ========================================
+                // 選択したユーザー数の表示
+                // ========================================
+                if (_selectedUserIds.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    color: Colors.deepPurple.withOpacity(0.1),
+                    child: Row(
                       children: [
-                        // ========================================
-                        // 選択したユーザー数の表示
-                        // ========================================
-                        if (_selectedUserIds.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            color: Colors.deepPurple.withOpacity(0.1),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.info_outline,
-                                    color: Colors.deepPurple),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '${_selectedUserIds.length}人を選択中',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // ========================================
-                        // フォロワーリスト
-                        // ========================================
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: _following.length,
-                            itemBuilder: (context, index) {
-                              final user = _following[index];
-                              final isSelected =
-                                  _selectedUserIds.contains(user.id);
-
-                              return CheckboxListTile(
-                                value: isSelected,
-                                onChanged: (_) => _toggleSelection(user.id),
-                                secondary: CircleAvatar(
-                                  backgroundColor: Colors.deepPurple,
-                                  backgroundImage: user.profileImage != null
-                                      ? NetworkImage(user.profileImage!)
-                                      : null,
-                                  child: user.profileImage == null
-                                      ? Text(
-                                          user.username[0].toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        )
-                                      : null,
-                                ),
-                                title: Text(user.username),
-                                subtitle: Text(user.email),
-                                activeColor: Colors.deepPurple,
-                              );
-                            },
-                          ),
+                        const Icon(
+                          Icons.info_outline,
+                          color: Colors.deepPurple,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_selectedUserIds.length}人を選択中',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
+                  ),
+
+                // ========================================
+                // フォロワーリスト
+                // ========================================
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: _following.length,
+                    itemBuilder: (context, index) {
+                      final user = _following[index];
+                      final isSelected = _selectedUserIds.contains(user.id);
+
+                      return CheckboxListTile(
+                        value: isSelected,
+                        onChanged: (_) => _toggleSelection(user.id),
+                        secondary: CircleAvatar(
+                          backgroundColor: Colors.deepPurple,
+                          backgroundImage: user.profileImage != null
+                              ? NetworkImage(user.profileImage!)
+                              : null,
+                          child: user.profileImage == null
+                              ? Text(
+                                  user.username[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        title: Text(user.username),
+                        subtitle: Text(user.email),
+                        activeColor: Colors.deepPurple,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
       // ========================================
       // 次へボタン（フローティングアクションボタン）
       // ========================================

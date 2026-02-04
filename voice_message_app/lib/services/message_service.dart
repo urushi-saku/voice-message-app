@@ -93,10 +93,7 @@ class MessageService {
 
     // 音声ファイルを添付
     request.files.add(
-      await http.MultipartFile.fromPath(
-        'voice',
-        voiceFile.path,
-      ),
+      await http.MultipartFile.fromPath('voice', voiceFile.path),
     );
 
     // 受信者IDリストをJSON文字列として送信
@@ -138,9 +135,7 @@ class MessageService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/messages/received'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -165,9 +160,7 @@ class MessageService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/messages/sent'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -197,9 +190,7 @@ class MessageService {
 
     final response = await http.put(
       Uri.parse('$BASE_URL/messages/$messageId/read'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode != 200) {
@@ -227,9 +218,7 @@ class MessageService {
 
     final response = await http.delete(
       Uri.parse('$BASE_URL/messages/$messageId'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode != 200) {
@@ -263,9 +252,7 @@ class MessageService {
 
     final response = await http.get(
       Uri.parse('$BASE_URL/messages/$messageId/download'),
-      headers: {
-        'Authorization': 'Bearer $token',
-      },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     if (response.statusCode == 200) {
@@ -283,7 +270,7 @@ class MessageService {
   /// 音声ファイルのURLを取得
   /// ========================================
   /// メッセージの音声ファイルを直接再生するためのURLを返します
-  /// 
+  ///
   /// 【注意】
   /// このメソッドは認証トークンを含まないため、
   /// バックエンドで静的ファイル配信が有効な場合のみ使用可能です

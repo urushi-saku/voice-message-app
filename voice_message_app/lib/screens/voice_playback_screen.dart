@@ -14,10 +14,7 @@ import 'dart:io';
 class VoicePlaybackScreen extends StatefulWidget {
   final MessageInfo message;
 
-  const VoicePlaybackScreen({
-    super.key,
-    required this.message,
-  });
+  const VoicePlaybackScreen({super.key, required this.message});
 
   @override
   State<VoicePlaybackScreen> createState() => _VoicePlaybackScreenState();
@@ -149,103 +146,108 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text('エラー: $_error'),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('戻る'),
-                      ),
-                    ],
-                  ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // ========================================
-                      // 送信者アイコン
-                      // ========================================
-                      CircleAvatar(
-                        radius: 80,
-                        backgroundColor: Colors.deepPurple,
-                        backgroundImage: widget.message.senderProfileImage != null
-                            ? NetworkImage(widget.message.senderProfileImage!)
-                            : null,
-                        child: widget.message.senderProfileImage == null
-                            ? Text(
-                                widget.message.senderUsername[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              )
-                            : null,
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // 送信者名
-                      Text(
-                        widget.message.senderUsername,
-                        style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 48),
-
-            // ========================================
-            // 再生バー（スライダー）
-            // ========================================
-            Slider(
-              min: 0,
-              max: _duration.inSeconds.toDouble(),
-              value: _position.inSeconds.toDouble().clamp(0, _duration.inSeconds.toDouble()),
-              activeColor: Colors.deepPurple,
-              onChanged: (value) async {
-                final position = Duration(seconds: value.toInt());
-                await _player.seek(position);
-              },
-            ),
-
-            // 時間表示
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(_formatDuration(_position)),
-                  Text(_formatDuration(_duration)),
+                  const Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('エラー: $_error'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('戻る'),
+                  ),
+                ],
+              ),
+            )
+          : Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // ========================================
+                  // 送信者アイコン
+                  // ========================================
+                  CircleAvatar(
+                    radius: 80,
+                    backgroundColor: Colors.deepPurple,
+                    backgroundImage: widget.message.senderProfileImage != null
+                        ? NetworkImage(widget.message.senderProfileImage!)
+                        : null,
+                    child: widget.message.senderProfileImage == null
+                        ? Text(
+                            widget.message.senderUsername[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 48,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // 送信者名
+                  Text(
+                    widget.message.senderUsername,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+
+                  const SizedBox(height: 48),
+
+                  // ========================================
+                  // 再生バー（スライダー）
+                  // ========================================
+                  Slider(
+                    min: 0,
+                    max: _duration.inSeconds.toDouble(),
+                    value: _position.inSeconds.toDouble().clamp(
+                      0,
+                      _duration.inSeconds.toDouble(),
+                    ),
+                    activeColor: Colors.deepPurple,
+                    onChanged: (value) async {
+                      final position = Duration(seconds: value.toInt());
+                      await _player.seek(position);
+                    },
+                  ),
+
+                  // 時間表示
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_formatDuration(_position)),
+                        Text(_formatDuration(_duration)),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ========================================
+                  // 再生・停止ボタン
+                  // ========================================
+                  IconButton(
+                    iconSize: 80,
+                    icon: Icon(
+                      _isPlaying
+                          ? Icons.pause_circle_filled
+                          : Icons.play_circle_filled,
+                      color: Colors.deepPurple,
+                    ),
+                    onPressed: _togglePlay,
+                  ),
                 ],
               ),
             ),
-
-            const SizedBox(height: 32),
-
-            // ========================================
-            // 再生・停止ボタン
-            // ========================================
-            IconButton(
-              iconSize: 80,
-              icon: Icon(
-                _isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                color: Colors.deepPurple,
-              ),
-              onPressed: _togglePlay,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
