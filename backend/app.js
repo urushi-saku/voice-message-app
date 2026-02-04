@@ -41,6 +41,8 @@ app.use(cors());
 app.use('/auth', require('./routes/auth'));
 // ユーザー関連のルート
 app.use('/users', require('./routes/user'));
+// メッセージ関連のルート
+app.use('/messages', require('./routes/message'));
 
 // ========================================
 // ファイル保存設定
