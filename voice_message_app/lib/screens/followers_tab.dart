@@ -6,6 +6,9 @@
 // 一覧を表示するタブです
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
+import '../services/user_service.dart';
 import 'select_follower_screen.dart';
 
 /// フォロワー一覧を表示するウィジェット
@@ -18,25 +21,67 @@ class FollowersTab extends StatefulWidget {
 
 class _FollowersTabState extends State<FollowersTab> {
   // ========================================
-  // サンプルデータ（将来的にはサーバーから取得）
+  // 状態変数
   // ========================================
-  final List<Map<String, String>> _followers = [
-    {
-      'name': '山田太郎',
-      'username': '@yamada_taro',
-      'message': '最近フォローしました',
-    },
-    {
-      'name': '佐藤花子',
-      'username': '@sato_hanako',
-      'message': 'よろしくお願いします！',
-    },
-    {
-      'name': '鈴木一郎',
-      'username': '@suzuki_ichiro',
-      'message': 'いつも楽しく聞いています',
-    },
-  ];
+  List<UserInfo> _followers = [];
+  List<UserInfo> _following = [];
+  bool _isLoading = true;
+  String? _error;
+  int _selectedTabIndex = 0; // 0: フォロワー, 1: フォロー中
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowers();
+  }
+
+  // ========================================
+  // フォロワー・フォロー中リストを読み込み
+  // ========================================
+  Future<void> _loadFollowers() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.user?.id;
+
+      if (userId == null) {
+        throw Exception('ユーザー情報が取得できません');
+      }
+
+      // フォロワーとフォロー中を並行取得
+      final results = await Future.wait([
+        UserService.getFollowers(userId),
+        UserService.getFollowing(userId),
+      ]);
+
+      setState(() {
+        _followers = results[0];
+        _following = results[1];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  // ========================================
+  // ユーザー検索画面を開く
+  // ========================================
+  void _openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const UserSearchScreen(),
+      ),
+    ).then((_) => _loadFollowers()); // 戻ってきたらリロード
+  }
 
   // ========================================
   // ボイスメッセージ送信画面を開く
@@ -52,127 +97,328 @@ class _FollowersTabState extends State<FollowersTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('フォロワー'),
-        actions: [
-          // ========================================
-          // 検索ボタン（将来の機能）
-          // ========================================
-          IconButton(
-            icon: const Icon(Icons.search),
-            tooltip: '検索',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('検索機能は準備中です')),
-              );
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('フォロワー'),
+          bottom: TabBar(
+            onTap: (index) {
+              setState(() {
+                _selectedTabIndex = index;
+              });
             },
+            tabs: const [
+              Tab(text: 'フォロワー'),
+              Tab(text: 'フォロー中'),
+            ],
           ),
-        ],
+          actions: [
+            // ========================================
+            // ユーザー検索ボタン
+            // ========================================
+            IconButton(
+              icon: const Icon(Icons.person_add),
+              tooltip: 'ユーザー検索',
+              onPressed: _openSearch,
+            ),
+          ],
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('エラー: $_error'),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadFollowers,
+                          child: const Text('再読み込み'),
+                        ),
+                      ],
+                    ),
+                  )
+                : TabBarView(
+                    children: [
+                      _buildFollowerList(_followers),
+                      _buildFollowerList(_following),
+                    ],
+                  ),
       ),
-      body: _followers.isEmpty
-          ? const Center(
-              child: Text('まだフォロワーがいません'),
-            )
-          : ListView.builder(
-              itemCount: _followers.length,
-              itemBuilder: (context, index) {
-                final follower = _followers[index];
+    );
+  }
 
-                return ListTile(
-                  // ========================================
-                  // フォロワーのアイコン
-                  // ========================================
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.deepPurple,
-                    child: Text(
-                      follower['name']![0], // 名前の最初の文字
+  // ========================================
+  // フォロワーリスト表示
+  // ========================================
+  Widget _buildFollowerList(List<UserInfo> users) {
+    if (users.isEmpty) {
+      return const Center(
+        child: Text('ユーザーがいません'),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadFollowers,
+      child: ListView.builder(
+        itemCount: users.length,
+        itemBuilder: (context, index) {
+          final user = users[index];
+
+          return ListTile(
+            // ========================================
+            // ユーザーアイコン
+            // ========================================
+            leading: CircleAvatar(
+              backgroundColor: Colors.deepPurple,
+              backgroundImage: user.profileImage != null
+                  ? NetworkImage(user.profileImage!)
+                  : null,
+              child: user.profileImage == null
+                  ? Text(
+                      user.username[0].toUpperCase(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ),
+                    )
+                  : null,
+            ),
 
-                  // ========================================
-                  // フォロワーの名前とユーザー名
-                  // ========================================
-                  title: Text(follower['name']!),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        follower['username']!,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        follower['message']!,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ],
+            // ========================================
+            // ユーザー名・メールアドレス
+            // ========================================
+            title: Text(user.username),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.email,
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
                   ),
-
-                  // ========================================
-                  // フォローバックボタン
-                  // ========================================
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${follower['name']}をフォローしました'),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                    ),
-                    child: const Text('フォロー'),
+                ),
+                if (user.bio.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    user.bio,
+                    style: const TextStyle(fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                ],
+              ],
+            ),
 
-                  // ========================================
-                  // タップしたらプロフィール表示（将来の機能）
-                  // ========================================
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: Text(follower['name']!),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('ユーザー名: ${follower['username']}'),
-                            const SizedBox(height: 8),
-                            Text('メッセージ: ${follower['message']}'),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('閉じる'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
+            // ========================================
+            // フォロワー数・フォロー中数
+            // ========================================
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${user.followersCount} フォロワー',
+                  style: const TextStyle(fontSize: 11),
+                ),
+                Text(
+                  '${user.followingCount} フォロー中',
+                  style: const TextStyle(fontSize: 11),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ========================================
+// ユーザー検索画面
+// ========================================
+class UserSearchScreen extends StatefulWidget {
+  const UserSearchScreen({super.key});
+
+  @override
+  State<UserSearchScreen> createState() => _UserSearchScreenState();
+}
+
+class _UserSearchScreenState extends State<UserSearchScreen> {
+  final _searchController = TextEditingController();
+  List<UserInfo> _searchResults = [];
+  bool _isSearching = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ========================================
+  // ユーザー検索
+  // ========================================
+  Future<void> _searchUsers(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _error = null;
+    });
+
+    try {
+      final results = await UserService.searchUsers(query);
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isSearching = false;
+      });
+    }
+  }
+
+  // ========================================
+  // フォロー/フォロー解除
+  // ========================================
+  Future<void> _toggleFollow(UserInfo user, bool isFollowing) async {
+    try {
+      if (isFollowing) {
+        await UserService.unfollowUser(user.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${user.username}のフォローを解除しました')),
+          );
+        }
+      } else {
+        await UserService.followUser(user.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${user.username}をフォローしました')),
+          );
+        }
+      }
+      // 再検索して状態を更新
+      _searchUsers(_searchController.text);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラー: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('ユーザー検索'),
+      ),
+      body: Column(
+        children: [
+          // ========================================
+          // 検索フィールド
+          // ========================================
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ユーザー名で検索',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchResults = [];
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (value) {
+                // デバウンス処理（0.5秒待ってから検索）
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  if (_searchController.text == value) {
+                    _searchUsers(value);
+                  }
+                });
               },
             ),
-      // ========================================
-      // 右下の+ボタン（ボイスメッセージ送信）
-      // ========================================
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openSendVoiceMessage,
-        tooltip: 'ボイスメッセージを送信',
-        backgroundColor: Colors.blue,
-        child: const Icon(Icons.add),
+          ),
+
+          // ========================================
+          // 検索結果
+          // ========================================
+          Expanded(
+            child: _isSearching
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null
+                    ? Center(child: Text('エラー: $_error'))
+                    : _searchResults.isEmpty
+                        ? const Center(
+                            child: Text('ユーザーが見つかりません'),
+                          )
+                        : ListView.builder(
+                            itemCount: _searchResults.length,
+                            itemBuilder: (context, index) {
+                              final user = _searchResults[index];
+                              // TODO: フォロー状態を確認する実装が必要
+                              final isFollowing = false;
+
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: Colors.deepPurple,
+                                  backgroundImage: user.profileImage != null
+                                      ? NetworkImage(user.profileImage!)
+                                      : null,
+                                  child: user.profileImage == null
+                                      ? Text(
+                                          user.username[0].toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                title: Text(user.username),
+                                subtitle: Text(user.email),
+                                trailing: ElevatedButton(
+                                  onPressed: () =>
+                                      _toggleFollow(user, isFollowing),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isFollowing
+                                        ? Colors.grey
+                                        : Colors.deepPurple,
+                                  ),
+                                  child: Text(
+                                    isFollowing ? 'フォロー中' : 'フォロー',
+                                    style:
+                                        const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+          ),
+        ],
       ),
     );
   }
