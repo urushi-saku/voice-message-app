@@ -178,3 +178,53 @@ exports.getMe = async (req, res) => {
     });
   }
 };
+
+/**
+ * FCMトークンを更新
+ * PUT /auth/fcm-token
+ * 
+ * 【処理フロー】
+ * ①リクエストボディからFCMトークンを取得
+ * ②現在のユーザーのfcmTokenフィールドを更新
+ * ③レスポンスを返す
+ * 
+ * 【使用例】
+ * アプリ起動時やトークン更新時にこのエンドポイントを呼び出して、
+ * サーバーに最新のFCMトークンを保存します
+ */
+exports.updateFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+
+    // 入力チェック
+    if (!fcmToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'FCMトークンは必須です',
+      });
+    }
+
+    // ユーザーのFCMトークンを更新
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { fcmToken },
+      { new: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'FCMトークンを更新しました',
+      data: {
+        userId: user._id,
+        fcmToken: user.fcmToken,
+      },
+    });
+  } catch (error) {
+    console.error('FCMトークン更新エラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'サーバーエラーが発生しました',
+      error: error.message,
+    });
+  }
+};

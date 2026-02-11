@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "voice_message_app (Chrome)",
+            "request": "launch",
+            "type": "dart",
+            "program": "voice_message_app/lib/main.dart",
+            "cwd": "${workspaceFolder}/voice_message_app",
+            "args": [
+                "-d",
+                "chrome",
+                "--web-port",
+                "5000"
+            ],
+            "env": {
+                "CHROME_EXECUTABLE": "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"
+            }
+        }
+    ]
+}

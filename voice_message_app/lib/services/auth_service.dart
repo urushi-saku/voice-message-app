@@ -17,6 +17,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'fcm_service.dart';
 
 /// 認証APIの基本URL（バックエンド）
 const String BASE_URL = 'http://localhost:3000';
@@ -158,9 +159,19 @@ class AuthService {
   // ========================================
   // ログアウト
   // ========================================
+  // ログアウト
+  // ========================================
   /// ユーザーをログアウトする（トークンを削除）
+  ///
+  /// 【処理フロー】
+  /// ①FCMトークンをサーバーから削除
+  /// ②ローカルストレージから認証トークンを削除
   static Future<void> logout() async {
     try {
+      // ①FCMトークンを削除（プッシュ通知を停止）
+      await FcmService.deleteToken();
+
+      // ②認証トークンを削除
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('authToken');
     } catch (e) {

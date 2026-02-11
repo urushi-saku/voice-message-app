@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
-import 'select_follower_screen.dart';
 
 /// フォロワー一覧を表示するウィジェット
 class FollowersTab extends StatefulWidget {
@@ -27,7 +26,6 @@ class _FollowersTabState extends State<FollowersTab> {
   List<UserInfo> _following = [];
   bool _isLoading = true;
   String? _error;
-  int _selectedTabIndex = 0; // 0: フォロワー, 1: フォロー中
 
   @override
   void initState() {
@@ -81,16 +79,6 @@ class _FollowersTabState extends State<FollowersTab> {
     ).then((_) => _loadFollowers()); // 戻ってきたらリロード
   }
 
-  // ========================================
-  // ボイスメッセージ送信画面を開く
-  // ========================================
-  void _openSendVoiceMessage() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SelectFollowerScreen()),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -98,13 +86,8 @@ class _FollowersTabState extends State<FollowersTab> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('フォロワー'),
-          bottom: TabBar(
-            onTap: (index) {
-              setState(() {
-                _selectedTabIndex = index;
-              });
-            },
-            tabs: const [
+          bottom: const TabBar(
+            tabs: [
               Tab(text: 'フォロワー'),
               Tab(text: 'フォロー中'),
             ],
@@ -390,13 +373,11 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         trailing: ElevatedButton(
                           onPressed: () => _toggleFollow(user, isFollowing),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isFollowing
-                                ? Colors.grey
-                                : Colors.deepPurple,
+                            backgroundColor: Colors.deepPurple,
                           ),
-                          child: Text(
-                            isFollowing ? 'フォロー中' : 'フォロー',
-                            style: const TextStyle(color: Colors.white),
+                          child: const Text(
+                            'フォロー',
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
                       );

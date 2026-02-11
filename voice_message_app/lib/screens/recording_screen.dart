@@ -161,7 +161,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
     try {
       // サーバーに音声ファイルをアップロード
-      final messageId = await MessageService.sendMessage(
+      await MessageService.sendMessage(
         voiceFile: File(_recordedPath!),
         receiverIds: widget.recipientIds,
         duration: null, // TODO: 録音時間を計測して渡す
@@ -222,7 +222,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      widget.recipients.join(', '),
+                      '${widget.recipientIds.length}人のフォロワー',
                       style: const TextStyle(fontSize: 14),
                     ),
                   ],

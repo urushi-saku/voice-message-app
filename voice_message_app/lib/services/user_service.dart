@@ -6,7 +6,6 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../constants.dart';
 import 'auth_service.dart';
 
 /// ユーザー情報を表すクラス

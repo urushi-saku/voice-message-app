@@ -75,6 +75,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+
+    // FCMトークン（プッシュ通知用）
+    // 初学者向け説明：Firebase Cloud Messagingでプッシュ通知を送るために
+    //                 デバイスを識別するトークンを保存します
+    fcmToken: {
+      type: String,
+      default: null,
+    },
   },
   {
     // タイムスタンプを自動管理

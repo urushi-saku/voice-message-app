@@ -15,7 +15,10 @@ const {
   getSentMessages,
   markAsRead,
   deleteMessage,
-  downloadMessage
+  downloadMessage,
+  searchMessages,
+  getMessageThreads,
+  getThreadMessages
 } = require('../controllers/messageController');
 
 // ========================================
@@ -68,6 +71,18 @@ router.post('/send', protect, upload.single('voice'), sendMessage);
 // 受信メッセージリスト取得
 // GET /messages/received
 router.get('/received', protect, getReceivedMessages);
+
+// メッセージ検索
+// GET /messages/search
+router.get('/search', protect, searchMessages);
+
+// スレッド一覧取得（送信者ごとにグループ化）
+// GET /messages/threads
+router.get('/threads', protect, getMessageThreads);
+
+// 特定の送信者からのメッセージ取得
+// GET /messages/thread/:senderId
+router.get('/thread/:senderId', protect, getThreadMessages);
 
 // 送信メッセージリスト取得
 // GET /messages/sent

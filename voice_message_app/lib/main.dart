@@ -8,17 +8,29 @@
 //
 // 【処理の流れ】
 // 1. main() 関数が最初に実行される
-// 2. runApp(const MyApp()) でアプリ起動
-// 3. MyApp で全体設定（テーマ、Provider、ルート）
-// 4. AuthWrapper で認証状態確認
-// 5. ログイン状態に応じて画面表示
+// 2. Firebase初期化（プッシュ通知用）
+// 3. runApp(const MyApp()) でアプリ起動
+// 4. MyApp で全体設定（テーマ、Provider、ルート）
+// 5. AuthWrapper で認証状態確認
+// 6. ログイン状態に応じて画面表示
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home_page.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'services/fcm_service.dart';
+import 'services/offline_service.dart';
+import 'services/network_connectivity_service.dart';
+import 'services/sync_service.dart';
+
+// FlutterFire CLI生成のオプションファイル
+// 'flutterfire configure' 実行後に自動生成されます
+// まだ実行していない場合、このインポートをコメントアウトしてください
+// import 'firebase_options.dart';
+import 'firebase_options.dart';
 
 // ========================================
 // エントリーポイント
@@ -27,8 +39,62 @@ import 'screens/register_screen.dart';
 /// アプリケーション実行時に最初に呼ばれる関数
 ///
 /// 【処理】
-/// runApp(const MyApp())でMyAppウィジェットを起動
-void main() {
+/// ①Flutter Widgetの初期化
+/// ②Firebase初期化（プッシュ通知用）
+/// ③FCMサービス初期化（通知受信設定）
+/// ④runApp(const MyApp())でMyAppウィジェットを起動
+///
+/// 【FlutterFire CLI使用時】
+/// 'flutterfire configure' 実行後、上記のインポートを有効化し、
+/// Firebase.initializeApp() の引数を追加：
+/// await Firebase.initializeApp(
+///   options: DefaultFirebaseOptions.currentPlatform,
+/// );
+void main() async {
+  // Flutter Widgetの初期化（async処理を使うために必要）
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    // Firebase初期化
+    // FlutterFire CLI使用時は options: DefaultFirebaseOptions.currentPlatform を追加
+    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    print('✅ Firebase initialized');
+
+    // FCMサービス初期化（通知受信設定）
+    await FcmService.initialize();
+  } catch (e) {
+    print('❌ Firebase initialization error: $e');
+    print('⚠️  Push notifications will not work');
+    print('⚠️  Run: cd voice_message_app && flutterfire configure');
+  }
+
+  // ========================================
+  // オフラインモード初期化
+  // ========================================
+  try {
+    // HiveデータベースとOfflineServiceを初期化
+    await OfflineService.initialize();
+    print('✅ Offline Service initialized');
+
+    // ネットワーク接続状態監視を開始
+    final networkService = NetworkConnectivityService();
+    await networkService.initialize();
+    print('✅ Network Connectivity Service initialized');
+    print('📡 Current status: ${networkService.getStatusText()}');
+
+    // 同期サービスを初期化
+    final syncService = SyncService();
+    // NOTE: SyncServiceの完全な初期化はMessageServiceが必要なため、
+    //       main.dartではなく、認証後にAuthProviderで実行
+    print('✅ Sync Service initialized');
+  } catch (e) {
+    print('❌ Offline Service initialization error: $e');
+    print('⚠️  Offline mode will not work');
+  }
+
   runApp(const MyApp());
 }
 
@@ -59,6 +125,16 @@ class MyApp extends StatelessWidget {
         // AuthProvider()が初期化される
         // 全子ウィジェット（全画面）から Consumer<AuthProvider> でアクセス可能
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+
+        // ネットワーク接続状態を管理するProvider
+        // NetworkConnectivityService が初期化される
+        // リアルタイムにオンライン/オフライン状態を監視
+        ChangeNotifierProvider(create: (_) => NetworkConnectivityService()),
+
+        // 同期処理を管理するProvider
+        // SyncService が初期化される
+        // オフラインメッセージの同期を管理
+        ChangeNotifierProvider(create: (_) => SyncService()),
       ],
       child: MaterialApp(
         title: 'ボイスメッセージアプリ', // アプリのタイトル（日本語）

@@ -1,6 +1,9 @@
 # 環境変数
 .env
 
+# Firebase秘密鍵（機密情報）
+config/serviceAccountKey.json
+
 # Node modules
 node_modules/
 

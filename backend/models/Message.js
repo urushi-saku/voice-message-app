@@ -89,11 +89,19 @@ const messageSchema = new mongoose.Schema(
       default: Date.now,
     },
 
-    // 削除フラグ
+    // 削除フラグ（互換性用）
     isDeleted: {
       type: Boolean,
       default: false,
     },
+
+    // 削除者リスト（全ユーザーが削除したかをチェックするため）
+    deletedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,

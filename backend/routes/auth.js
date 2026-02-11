@@ -37,4 +37,11 @@ router.post('/login', authController.login);
  */
 router.get('/me', protect, authController.getMe);
 
+/**
+ * @route   PUT /auth/fcm-token
+ * @desc    FCMトークンを更新
+ * @access  Private
+ */
+router.put('/fcm-token', protect, authController.updateFcmToken);
+
 module.exports = router;

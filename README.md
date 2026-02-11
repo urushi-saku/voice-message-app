@@ -13,6 +13,13 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - **README.md** : このファイル
 - **PROJECT_STRUCTURE_AND_ROADMAP.txt** : 詳細な技術仕様とロードマップ
 
+## 📈 プロジェクト進捗
+
+- **フェーズ1（データベース連携＆認証）**: ✅ 完了
+- **フェーズ2（フォロワー機能強化）**: ✅ 完了
+- **フェーズ3（メッセージング機能強化）**: ✅ **完了** 🎉
+- **フェーズ4以降**: 未着手
+
 ## ✨ 実装済み機能
 
 ### 🔐 認証・ユーザー管理
@@ -58,8 +65,27 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 
 - **メッセージ操作**
   - スワイプで削除（確認ダイアログ付き）
+  - ローカルファイル物理削除（デバイスキャッシュクリア）
+  - サーバーファイル物理削除（全ユーザー削除時）
   - 既読マーク（再生時自動）
   - プルダウンで更新
+  - メッセージ検索（送信者名）
+  - 既読/未読フィルター
+  - 日付範囲フィルター
+
+- **プッシュ通知（Firebase Cloud Messaging）** 🆕
+  - メッセージ受信時のリアルタイム通知
+  - バックグラウンド通知対応
+  - 通知タップでアプリ起動
+  - FCMトークン自動管理
+  - ログアウト時の通知停止
+
+- **メッセージスレッド機能**
+  - 送信者別のメッセージスレッド管理
+  - スレッド一覧画面（未読バッジ、最新メッセージ表示）
+  - スレッド詳細画面
+  - リスト表示 ↔ カード表示の切り替え
+  - ボイスカード（グラデーション背景、送信者情報付き）
 
 - **音声再生**
   - 認証付きファイルダウンロード
@@ -71,7 +97,11 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 
 ### 🎨 UI/UX
 
-- タブナビゲーション（ホーム/フォロワー/受信/プロフィール）
+- 4タブナビゲーション
+  - **メッセージ**: スレッド一覧（相手ごと）
+  - **フォロワー**: フォロワー管理・メッセージ送信
+  - **受信一覧**: 全受信メッセージ（従来形式）
+  - **プロフィール**: ユーザー情報
 - Material Design準拠
 - ローディングインジケーター
 - エラーハンドリングとユーザーフレンドリーなメッセージ
@@ -86,6 +116,7 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
   - username（ユニーク）、email（ユニーク）、password（ハッシュ化）
   - profileImage、bio
   - followersCount、followingCount（自動カウント）
+  - fcmToken（プッシュ通知用デバイストークン）
 
 - **Follower モデル**
   - user、follower（参照）
@@ -97,6 +128,7 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
   - filePath、fileSize、duration、mimeType
   - readStatus（ユーザーごとの既読状態）
   - isDeleted（論理削除）
+  - deletedBy（削除者リスト、全ユーザー削除時にファイル物理削除）
 
 #### API エンドポイント
 
@@ -104,6 +136,7 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - `POST /auth/register` - ユーザー登録
 - `POST /auth/login` - ログイン（JWTトークン発行）
 - `GET /auth/me` - 現在のユーザー情報取得
+- `PUT /auth/fcm-token` - FCMトークン更新（プッシュ通知用）
 
 **ユーザーAPI (`/users`)**
 - `GET /users/search?q=keyword` - ユーザー検索
@@ -117,6 +150,9 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - `POST /messages/send` - メッセージ送信（multipart/form-data）
 - `GET /messages/received` - 受信メッセージ一覧
 - `GET /messages/sent` - 送信メッセージ一覧
+- `GET /messages/search` - メッセージ検索（送信者名、日付範囲、既読フィルター）
+- `GET /messages/threads` - スレッド一覧（送信者ごと、未読数付き）
+- `GET /messages/thread/:senderId` - 特定相手とのメッセージ一覧
 - `PUT /messages/:id/read` - 既読マーク
 - `DELETE /messages/:id` - メッセージ削除（論理削除）
 - `GET /messages/:id/download` - ファイルダウンロード（認証必須）
@@ -129,6 +165,13 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - ファイルアップロード制限（10MB、audio MIMEタイプのみ）
 - アクセス権限チェック（自分宛のメッセージのみダウンロード可能）
 
+#### プッシュ通知
+
+- Firebase Admin SDK統合
+- メッセージ送信時に受信者全員へ通知
+- FCMトークン管理
+- バックグラウンド/フォアグラウンド通知対応
+
 ## 🚀 セットアップ手順
 
 ### 前提条件
@@ -136,6 +179,7 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - Node.js 18+ がインストールされていること
 - Flutter 3.9.2+ がインストールされていること
 - MongoDB Atlas アカウント（または ローカルMongoDB）
+- Firebase プロジェクト（プッシュ通知機能を使う場合）
 
 ### 1. バックエンドのセットアップ
 
@@ -154,6 +198,16 @@ JWT_SECRET=your-secret-key
 PORT=3000
 ```
 
+**Firebase設定（プッシュ通知用）**
+
+Firebase Consoleから秘密鍵をダウンロードし配置：
+```bash
+# serviceAccountKey.json を backend/config/ に配置
+backend/config/serviceAccountKey.json
+```
+
+詳細は [FIREBASE_SETUP.md](FIREBASE_SETUP.md) を参照。
+
 **サーバー起動**
 
 ```bash
@@ -168,6 +222,24 @@ npm start
 cd voice_message_app
 flutter pub get
 ```
+
+**Firebase設定（プッシュ通知用）**
+
+FlutterFire CLIで自動設定（推奨）：
+
+```bash
+# FlutterFire CLIインストール（初回のみ）
+dart pub global activate flutterfire_cli
+export PATH="$PATH":"$HOME/.pub-cache/bin"
+
+# Firebase自動設定
+cd voice_message_app
+flutterfire configure
+```
+
+対話的に選択すると、自動的に設定ファイルが配置されます。
+
+詳細な手順は [FIREBASE_SETUP.md](FIREBASE_SETUP.md) を参照。
 
 **定数の設定**
 

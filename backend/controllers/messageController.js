@@ -7,6 +7,7 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
 const Follower = require('../models/Follower');
+const { sendPushNotificationToMultiple } = require('../config/firebase');
 const path = require('path');
 const fs = require('fs');
 
@@ -84,6 +85,39 @@ exports.sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+
+    // 【プッシュ通知送信】
+    // 送信者情報を取得
+    const sender = await User.findById(senderId).select('username');
+    
+    // 受信者のFCMトークンを取得
+    const receivers = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
+    const fcmTokens = receivers
+      .map(receiver => receiver.fcmToken)
+      .filter(token => token); // nullを除外
+
+    // プッシュ通知を送信
+    if (fcmTokens.length > 0) {
+      try {
+        const durationText = duration ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
+        await sendPushNotificationToMultiple(
+          fcmTokens,
+          {
+            title: `${sender.username}から新しいメッセージ`,
+            body: durationText ? `ボイスメッセージ (${durationText})` : 'ボイスメッセージが届きました',
+          },
+          {
+            messageId: newMessage._id.toString(),
+            senderId: senderId,
+            senderUsername: sender.username,
+            type: 'new_message',
+          }
+        );
+      } catch (notificationError) {
+        // 通知送信エラーでもメッセージ送信は成功とする
+        console.error('プッシュ通知送信エラー:', notificationError);
+      }
+    }
 
     res.status(201).json({
       message: 'メッセージを送信しました',
@@ -217,7 +251,14 @@ exports.markAsRead = async (req, res) => {
 // メッセージ削除
 // DELETE /messages/:id
 // ========================================
-// 指定したメッセージを削除します（論理削除）
+// 指定したメッセージを削除します
+// 
+// 【処理フロー】
+// ①ユーザーが削除対象か確認（送信者/受信者）
+// ②削除者リストに追加
+// ③全ユーザー（送信者＋全受信者）が削除したか判定
+// ④全員削除の場合：ファイル物理削除 → レコード削除
+// ⑤そうでない場合：論理削除フラグのみセット
 exports.deleteMessage = async (req, res) => {
   try {
     const messageId = req.params.id;
@@ -238,11 +279,66 @@ exports.deleteMessage = async (req, res) => {
       return res.status(403).json({ error: 'このメッセージを削除する権限がありません' });
     }
 
-    // 論理削除
+    // 削除者リストに追加（重複排除）
+    if (!message.deletedBy.includes(userId)) {
+      message.deletedBy.push(userId);
+    }
+
+    // 論理削除フラグを設定
     message.isDeleted = true;
+    
+    // 全ユーザー（送信者＋全受信者）が削除したかチェック
+    const allUsersInvolved = [
+      message.sender.toString(),
+      ...message.receivers.map(r => r.toString())
+    ];
+    
+    const uniqueAllUsers = [...new Set(allUsersInvolved)];
+    const deletedUserIds = message.deletedBy.map(id => id.toString());
+    
+    const allUsersDeleted = uniqueAllUsers.every(userId => 
+      deletedUserIds.includes(userId)
+    );
+
+    // 全員が削除した場合：ファイル物理削除 → レコード削除
+    if (allUsersDeleted) {
+      // ファイル物理削除
+      if (fs.existsSync(message.filePath)) {
+        try {
+          fs.unlinkSync(message.filePath);
+          console.log(`ファイル削除完了: ${message.filePath}`);
+        } catch (fileError) {
+          console.error(`ファイル削除失敗: ${message.filePath}`, fileError);
+          // ファイル削除失敗してもメッセージレコードは削除する
+        }
+      }
+
+      // 画像がある場合も削除
+      if (message.attachedImage && fs.existsSync(message.attachedImage)) {
+        try {
+          fs.unlinkSync(message.attachedImage);
+          console.log(`画像削除完了: ${message.attachedImage}`);
+        } catch (fileError) {
+          console.error(`画像削除失敗: ${message.attachedImage}`, fileError);
+        }
+      }
+
+      // メッセージレコード削除
+      await Message.deleteOne({ _id: messageId });
+
+      return res.json({ 
+        message: 'メッセージを削除しました',
+        physicallyDeleted: true
+      });
+    }
+
+    // 全員削除でない場合：論理削除フラグのみセット
     await message.save();
 
-    res.json({ message: 'メッセージを削除しました' });
+    res.json({ 
+      message: 'メッセージを削除しました',
+      physicallyDeleted: false
+    });
   } catch (error) {
     console.error('メッセージ削除エラー:', error);
     res.status(500).json({ error: 'メッセージの削除に失敗しました' });
@@ -284,5 +380,212 @@ exports.downloadMessage = async (req, res) => {
   } catch (error) {
     console.error('ファイルダウンロードエラー:', error);
     res.status(500).json({ error: 'ファイルのダウンロードに失敗しました' });
+  }
+};
+
+// ========================================
+// メッセージ検索
+// GET /messages/search
+// ========================================
+// 受信メッセージを検索およびフィルタリングします
+// 
+// 【クエリパラメータ】
+// - q: 検索文字列（送信者のユーザー名で検索）
+// - dateFrom: 開始日時（ISO 8601形式）
+// - dateTo: 終了日時（ISO 8601形式）
+// - isRead: 既読フィルター（'true', 'false', または未指定）
+// 
+// 【処理フロー】
+// ①クエリパラメータを取得
+// ②検索条件を構築
+// ③メッセージを検索して返す
+exports.searchMessages = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { q, dateFrom, dateTo, isRead } = req.query;
+
+    // 基本条件：自分宛てのメッセージで、削除されていないもの
+    const query = {
+      receivers: userId,
+      isDeleted: false
+    };
+
+    // 日付範囲フィルター
+    if (dateFrom || dateTo) {
+      query.sentAt = {};
+      if (dateFrom) {
+        query.sentAt.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.sentAt.$lte = new Date(dateTo);
+      }
+    }
+
+    // メッセージを取得（送信者情報をpopulate）
+    let messages = await Message.find(query)
+      .populate('sender', 'username profileImage')
+      .sort({ sentAt: -1 });
+
+    // 送信者名で検索（クライアントサイドフィルタリング）
+    if (q && q.trim()) {
+      const searchTerm = q.trim().toLowerCase();
+      messages = messages.filter(message => 
+        message.sender.username.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    // 既読/未読フィルター
+    if (isRead === 'true' || isRead === 'false') {
+      const readFilter = isRead === 'true';
+      messages = messages.filter(message => {
+        const readStatus = message.readStatus.find(rs => rs.user.toString() === userId);
+        return readStatus ? readStatus.isRead === readFilter : !readFilter;
+      });
+    }
+
+    // レスポンスを整形
+    const result = messages.map(message => {
+      const readStatus = message.readStatus.find(rs => rs.user.toString() === userId);
+      return {
+        _id: message._id,
+        sender: {
+          _id: message.sender._id,
+          username: message.sender.username,
+          profileImage: message.sender.profileImage
+        },
+        filePath: message.filePath,
+        fileSize: message.fileSize,
+        duration: message.duration,
+        mimeType: message.mimeType,
+        sentAt: message.sentAt,
+        isRead: readStatus ? readStatus.isRead : false,
+        readAt: readStatus ? readStatus.readAt : null
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('メッセージ検索エラー:', error);
+    res.status(500).json({ error: 'メッセージの検索に失敗しました' });
+  }
+};
+
+// ========================================
+// スレッド一覧取得（送信者ごとにグループ化）
+// GET /messages/threads
+// ========================================
+// 受信メッセージを送信者ごとにグループ化して返します
+// 
+// 【レスポンス】
+// - sender: 送信者情報
+// - lastMessage: 最新メッセージ
+// - unreadCount: 未読メッセージ数
+// - totalCount: 総メッセージ数
+// - lastMessageAt: 最終メッセージ日時
+exports.getMessageThreads = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 自分宛てのメッセージを取得（削除されていないもの）
+    const messages = await Message.find({
+      receivers: userId,
+      isDeleted: false
+    })
+      .populate('sender', 'username profileImage')
+      .sort({ sentAt: -1 });
+
+    // 送信者ごとにグループ化
+    const threadsMap = new Map();
+
+    messages.forEach(message => {
+      const senderId = message.sender._id.toString();
+      
+      if (!threadsMap.has(senderId)) {
+        // このスレッドの未読数を計算
+        const unreadCount = messages.filter(m => {
+          if (m.sender._id.toString() !== senderId) return false;
+          const readStatus = m.readStatus.find(rs => rs.user.toString() === userId);
+          return readStatus ? !readStatus.isRead : true;
+        }).length;
+
+        // このスレッドの総数を計算
+        const totalCount = messages.filter(m => 
+          m.sender._id.toString() === senderId
+        ).length;
+
+        threadsMap.set(senderId, {
+          sender: {
+            _id: message.sender._id,
+            username: message.sender.username,
+            profileImage: message.sender.profileImage
+          },
+          lastMessage: {
+            _id: message._id,
+            sentAt: message.sentAt,
+            duration: message.duration,
+            isRead: message.readStatus.find(rs => rs.user.toString() === userId)?.isRead || false
+          },
+          unreadCount: unreadCount,
+          totalCount: totalCount,
+          lastMessageAt: message.sentAt
+        });
+      }
+    });
+
+    // Map を配列に変換し、最新メッセージ順にソート
+    const threads = Array.from(threadsMap.values()).sort((a, b) => 
+      new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
+    );
+
+    res.json(threads);
+  } catch (error) {
+    console.error('スレッド一覧取得エラー:', error);
+    res.status(500).json({ error: 'スレッド一覧の取得に失敗しました' });
+  }
+};
+
+// ========================================
+// 特定の送信者からのメッセージ取得
+// GET /messages/thread/:senderId
+// ========================================
+// 指定した送信者からの全メッセージを取得します
+exports.getThreadMessages = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const senderId = req.params.senderId;
+
+    // 指定した送信者からの自分宛てメッセージを取得
+    const messages = await Message.find({
+      sender: senderId,
+      receivers: userId,
+      isDeleted: false
+    })
+      .populate('sender', 'username profileImage')
+      .sort({ sentAt: -1 });
+
+    // レスポンスを整形
+    const result = messages.map(message => {
+      const readStatus = message.readStatus.find(rs => rs.user.toString() === userId);
+      return {
+        _id: message._id,
+        sender: {
+          _id: message.sender._id,
+          username: message.sender.username,
+          profileImage: message.sender.profileImage
+        },
+        filePath: message.filePath,
+        fileSize: message.fileSize,
+        duration: message.duration,
+        mimeType: message.mimeType,
+        sentAt: message.sentAt,
+        isRead: readStatus ? readStatus.isRead : false,
+        readAt: readStatus ? readStatus.readAt : null
+      };
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('スレッドメッセージ取得エラー:', error);
+    res.status(500).json({ error: 'メッセージの取得に失敗しました' });
   }
 };
