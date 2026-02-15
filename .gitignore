@@ -2,6 +2,10 @@
 node_modules/
 .env
 
+# Firebase
+backend/config/serviceAccountKey.json
+backend/config/serviceAccountKey.*.json
+
 # Flutter
 build/
 .dart_tool/

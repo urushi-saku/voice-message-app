@@ -5,9 +5,9 @@
 
 /// 録音品質の列挙型
 enum RecordingQuality {
-  low,    // 低品質（小さいファイルサイズ）
+  low, // 低品質（小さいファイルサイズ）
   medium, // 中品質（バランス）
-  high,   // 高品質（大きいファイルサイズ）
+  high, // 高品質（大きいファイルサイズ）
 }
 
 /// 録音品質設定クラス
@@ -28,20 +28,20 @@ class RecordingConfig {
       case RecordingQuality.low:
         return const RecordingConfig(
           quality: RecordingQuality.low,
-          sampleRate: 16000,  // 16kHz
-          bitRate: 32000,     // 32kbps
+          sampleRate: 16000, // 16kHz
+          bitRate: 32000, // 32kbps
         );
       case RecordingQuality.medium:
         return const RecordingConfig(
           quality: RecordingQuality.medium,
-          sampleRate: 22050,  // 22.05kHz
-          bitRate: 64000,     // 64kbps
+          sampleRate: 22050, // 22.05kHz
+          bitRate: 64000, // 64kbps
         );
       case RecordingQuality.high:
         return const RecordingConfig(
           quality: RecordingQuality.high,
-          sampleRate: 44100,  // 44.1kHz (CD品質)
-          bitRate: 128000,    // 128kbps
+          sampleRate: 44100, // 44.1kHz (CD品質)
+          bitRate: 128000, // 128kbps
         );
     }
   }

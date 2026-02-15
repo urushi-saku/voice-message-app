@@ -418,16 +418,30 @@ voice-message-app/
 │   ├── ✅ スレッド機能（スレッド一覧・詳細画面）
 │   └── ✅ リスト表示・カード表示の切り替え
 │
-└── 5.4 今後の改善予定
-    └── ✅ メッセージ通知機能（Firebase Cloud Messaging）
-        ├── ✅ Firebase Admin SDK統合（バックエンド）
-        ├── ✅ FCMトークン管理（User モデル拡張）
-        ├── ✅ メッセージ送信時プッシュ通知
-        ├── ✅ firebase_messaging パッケージ統合
-        ├── ✅ FCMサービス実装（通知受信・タップ処理）
-        ├── ✅ ログイン時FCMトークン送信
-        ├── ✅ ログアウト時FCMトークン削除
-        └── ⏳ Firebase設定ファイル準備（ユーザー側で設定）
+└── 5.4 メッセージ通知機能（Firebase Cloud Messaging） ⏳ 部分実装
+    ├── ✅ FCMサービス実装（firebase_messagingパッケージ統合）
+    │   ├── ✅ 通知受信リスナー設定
+    │   ├── ✅ バックグラウンド通知ハンドラー
+    │   └── ✅ トークン管理（更新・削除）
+    ├── ✅ Firebase Admin SDK設定コード
+    │   ├── ✅ serviceAccountKey.jsonテンプレート
+    │   ├── ✅ Firebase初期化ロジック
+    │   └── ✅ FCM通知送信関数
+    ├── ⏳ Firebase秘密鍵設定（ユーザー手動設定）
+    │   ├── ✅ セットアップドキュメント作成（FIREBASE_BACKEND_SETUP.md）
+    │   ├── ✅ .env.example にFCM設定追加
+    │   ├── ✅ .gitignore に serviceAccountKey.json 追加
+    │   ├── ✅ firebase_options.dart テンプレート生成
+    │   └── ⏳ 実際のserviceAccountKey.json配置（ユーザー・Firebase Console）
+    ├── ✅ バックエンドAPI実装
+    │   ├── ✅ PUT /auth/fcm-token - FCMトークン更新
+    │   ├── ✅ User モデルにfcmTokenフィールド
+    │   └── ✅ メッセージ送信時の通知送信ロジック
+    ├── ✅ フロントエンド実装
+    │   ├── ✅ fcm_service.dart - FCM通知管理
+    │   ├── ✅ Firebase初期化（main.dart）
+    │   └── ✅ ログイン時のFCMトークン送信
+    └── ⏳ 通知タップ時の画面遷移処理
 
 【フェーズ4：高度な機能（優先度：中）】✅ 完了（オフラインモード）
 ┌─────────────────────────────────────────────────────────────────

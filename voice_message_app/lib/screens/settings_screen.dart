@@ -30,8 +30,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// ========================================
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final qualityIndex = prefs.getInt('recording_quality') ?? 1; // デフォルト: medium
-    
+    final qualityIndex =
+        prefs.getInt('recording_quality') ?? 1; // デフォルト: medium
+
     setState(() {
       _selectedQuality = RecordingQuality.values[qualityIndex];
       _isLoading = false;
@@ -44,30 +45,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveQuality(RecordingQuality quality) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('recording_quality', quality.index);
-    
+
     setState(() {
       _selectedQuality = quality;
     });
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('録音品質を保存しました')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('録音品質を保存しました')));
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('設定'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('設定'), elevation: 0),
       body: ListView(
         children: [
           // ========================================
@@ -119,7 +115,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Text(
                   config.displayName,
                   style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
                 subtitle: Column(

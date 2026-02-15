@@ -50,12 +50,13 @@ class _RecordingScreenState extends State<RecordingScreen> {
   // ========================================
   Future<void> _loadRecordingQuality() async {
     final prefs = await SharedPreferences.getInstance();
-    final qualityIndex = prefs.getInt('recording_quality') ?? 1; // デフォルト: medium
-    
+    final qualityIndex =
+        prefs.getInt('recording_quality') ?? 1; // デフォルト: medium
+
     setState(() {
       _currentQuality = RecordingQuality.values[qualityIndex];
     });
-    
+
     // AudioServiceに品質を設定
     _audioService.setQuality(_currentQuality);
   }
@@ -221,7 +222,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
   @override
   Widget build(BuildContext context) {
     final config = RecordingConfig.fromQuality(_currentQuality);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ボイスメッセージを録音'),
@@ -234,10 +235,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
-                    '録音品質',
-                    style: TextStyle(fontSize: 10),
-                  ),
+                  const Text('録音品質', style: TextStyle(fontSize: 10)),
                   Text(
                     config.displayName,
                     style: const TextStyle(

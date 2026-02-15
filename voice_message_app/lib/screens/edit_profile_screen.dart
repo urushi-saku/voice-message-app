@@ -23,7 +23,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _bioController = TextEditingController();
-  
+
   File? _selectedImage;
   bool _isLoading = false;
   bool _isImageChanged = false;
@@ -67,9 +67,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('画像の選択に失敗しました: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('画像の選択に失敗しました: $e')));
     }
   }
 
@@ -110,16 +110,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('プロフィールを更新しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('プロフィールを更新しました')));
 
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('プロフィールの更新に失敗しました: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('プロフィールの更新に失敗しました: $e')));
     } finally {
       if (mounted) {
         setState(() {
@@ -135,9 +135,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final currentUser = authProvider.user;
 
     if (currentUser == null) {
-      return const Scaffold(
-        body: Center(child: Text('ユーザー情報が見つかりません')),
-      );
+      return const Scaffold(body: Center(child: Text('ユーザー情報が見つかりません')));
     }
 
     return Scaffold(
@@ -196,9 +194,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         backgroundImage: _selectedImage != null
                             ? FileImage(_selectedImage!)
                             : (currentUser.profileImage != null
-                                ? NetworkImage(currentUser.profileImage!)
-                                : null) as ImageProvider?,
-                        child: _selectedImage == null &&
+                                      ? NetworkImage(currentUser.profileImage!)
+                                      : null)
+                                  as ImageProvider?,
+                        child:
+                            _selectedImage == null &&
                                 currentUser.profileImage == null
                             ? const Icon(
                                 Icons.person,
@@ -301,10 +301,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         children: [
                           const Text(
                             'メールアドレス',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                           const SizedBox(height: 4),
                           Text(

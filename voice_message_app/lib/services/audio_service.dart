@@ -17,7 +17,7 @@ class AudioService {
   // ========================================
   final AudioRecorder _recorder = AudioRecorder();
   final AudioPlayer _player = AudioPlayer();
-  
+
   String? _recordingPath; // 録音中のファイルのパス
   bool _isRecording = false; // 録音中かどうか
   RecordingQuality _quality = RecordingQuality.medium; // デフォルト品質
@@ -33,7 +33,7 @@ class AudioService {
   // 録音品質を設定
   // ========================================
   /// 録音品質を設定します
-  /// 
+  ///
   /// パラメータ:
   ///   - quality: 設定する品質レベル
   void setQuality(RecordingQuality quality) {
@@ -44,7 +44,7 @@ class AudioService {
   // 録音を開始
   // ========================================
   /// 音声の録音を開始します
-  /// 
+  ///
   /// 戻り値:
   ///   - true: 録音開始成功
   ///   - false: 録音開始失敗（権限がない、既に録音中など）
@@ -58,7 +58,7 @@ class AudioService {
       if (await _recorder.hasPermission()) {
         // 保存先のディレクトリを取得
         final directory = await getApplicationDocumentsDirectory();
-        
+
         // ファイル名を生成（現在時刻をミリ秒で）
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         _recordingPath = '${directory.path}/voice_$timestamp.m4a';
@@ -79,7 +79,7 @@ class AudioService {
         _isRecording = true;
         return true;
       }
-      
+
       return false;
     } catch (e) {
       print('録音開始エラー: $e');
@@ -91,7 +91,7 @@ class AudioService {
   // 録音を停止
   // ========================================
   /// 音声の録音を停止します
-  /// 
+  ///
   /// 戻り値: 録音されたファイルのパス（録音していない場合はnull）
   Future<String?> stopRecording() async {
     if (!_isRecording) {
@@ -113,7 +113,7 @@ class AudioService {
   // ローカル音声ファイルを再生
   // ========================================
   /// 録音した音声ファイルをローカルで再生します
-  /// 
+  ///
   /// パラメータ:
   ///   - path: 再生する音声ファイルのパス
   Future<void> playLocal(String path) async {
@@ -128,7 +128,7 @@ class AudioService {
   // サーバー上の音声ファイルを再生
   // ========================================
   /// サーバーにアップロードされた音声ファイルを再生します
-  /// 
+  ///
   /// パラメータ:
   ///   - url: 音声ファイルのURL
   Future<void> playRemote(String url) async {
