@@ -216,3 +216,116 @@ exports.getUserById = async (req, res) => {
     res.status(500).json({ error: 'ユーザー情報の取得に失敗しました' });
   }
 };
+
+// ========================================
+// プロフィール更新
+// PUT /users/profile
+// ========================================
+// 自分のプロフィール情報（username, bio）を更新します
+exports.updateProfile = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const { username, bio } = req.body;
+
+    // 更新するフィールドを構築
+    const updateFields = {};
+    
+    if (username !== undefined) {
+      // ユーザー名のバリデーション
+      if (username.trim().length < 3) {
+        return res.status(400).json({ error: 'ユーザー名は3文字以上必要です' });
+      }
+      if (username.trim().length > 30) {
+        return res.status(400).json({ error: 'ユーザー名は30文字以内で設定してください' });
+      }
+
+      // ユーザー名の重複チェック（自分以外）
+      const existingUser = await User.findOne({
+        username: username.trim(),
+        _id: { $ne: currentUserId }
+      });
+      if (existingUser) {
+        return res.status(400).json({ error: 'このユーザー名は既に使用されています' });
+      }
+
+      updateFields.username = username.trim();
+    }
+
+    if (bio !== undefined) {
+      // 自己紹介のバリデーション
+      if (bio.length > 200) {
+        return res.status(400).json({ error: '自己紹介は200文字以内で設定してください' });
+      }
+      updateFields.bio = bio;
+    }
+
+    // 更新するフィールドがない場合
+    if (Object.keys(updateFields).length === 0) {
+      return res.status(400).json({ error: '更新する情報がありません' });
+    }
+
+    // プロフィール更新
+    const updatedUser = await User.findByIdAndUpdate(
+      currentUserId,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).select('username email profileImage bio followersCount followingCount');
+
+    res.json({
+      message: 'プロフィールを更新しました',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('プロフィール更新エラー:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: 'このユーザー名は既に使用されています' });
+    }
+    res.status(500).json({ error: 'プロフィールの更新に失敗しました' });
+  }
+};
+
+// ========================================
+// プロフィール画像更新
+// PUT /users/profile/image
+// ========================================
+// 自分のプロフィール画像を更新します（multerミドルウェアで処理）
+exports.updateProfileImage = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    // ファイルがアップロードされたか確認
+    if (!req.file) {
+      return res.status(400).json({ error: 'プロフィール画像ファイルが必要です' });
+    }
+
+    // ファイルパスを取得（uploadsディレクトリからの相対パス）
+    const profileImagePath = req.file.path.replace(/\\/g, '/'); // Windowsパス対策
+
+    // 古いプロフィール画像がある場合は削除
+    const user = await User.findById(currentUserId);
+    if (user.profileImage) {
+      const fs = require('fs').promises;
+      const oldImagePath = user.profileImage;
+      try {
+        await fs.unlink(oldImagePath);
+      } catch (err) {
+        console.log('古いプロフィール画像の削除に失敗:', err.message);
+      }
+    }
+
+    // プロフィール画像のパスを更新
+    const updatedUser = await User.findByIdAndUpdate(
+      currentUserId,
+      { $set: { profileImage: profileImagePath } },
+      { new: true }
+    ).select('username email profileImage bio followersCount followingCount');
+
+    res.json({
+      message: 'プロフィール画像を更新しました',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('プロフィール画像更新エラー:', error);
+    res.status(500).json({ error: 'プロフィール画像の更新に失敗しました' });
+  }
+};

@@ -90,9 +90,9 @@ exports.sendMessage = async (req, res) => {
     // 送信者情報を取得
     const sender = await User.findById(senderId).select('username');
     
-    // 受信者のFCMトークンを取得
-    const receivers = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
-    const fcmTokens = receivers
+    // 受信者のFCMトークンを取得（変数名を receiversData に変更）
+    const receiversData = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
+    const fcmTokens = receiversData
       .map(receiver => receiver.fcmToken)
       .filter(token => token); // nullを除外
 

@@ -6,6 +6,8 @@
 
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
 const { protect } = require('../middleware/auth');
 const {
   searchUsers,
@@ -13,8 +15,48 @@ const {
   unfollowUser,
   getFollowers,
   getFollowing,
-  getUserById
+  getUserById,
+  updateProfile,
+  updateProfileImage
 } = require('../controllers/userController');
+
+// ========================================
+// Multer設定（プロフィール画像アップロード用）
+// ========================================
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/profiles/'); // uploadsディレクトリに保存
+  },
+  filename: (req, file, cb) => {
+    // タイムスタンプ + ユーザーID + 拡張子で保存
+    const ext = path.extname(file.originalname);
+    cb(null, `profile-${req.user.id}-${Date.now()}${ext}`);
+  }
+});
+
+// ファイルフィルター（画像ファイルのみ許可）
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    'image/jpeg',       // jpg, jpeg
+    'image/png',        // png
+    'image/gif',        // gif
+    'image/webp'        // webp
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('画像ファイルのみアップロード可能です'), false);
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 最大5MB
+  }
+});
 
 // ========================================
 // すべてのルートは認証が必要
@@ -25,6 +67,14 @@ const {
 // ユーザー検索
 // GET /users/search?q=username
 router.get('/search', protect, searchUsers);
+
+// プロフィール更新
+// PUT /users/profile
+router.put('/profile', protect, updateProfile);
+
+// プロフィール画像更新
+// PUT /users/profile/image
+router.put('/profile/image', protect, upload.single('image'), updateProfileImage);
 
 // ユーザー詳細取得
 // GET /users/:id

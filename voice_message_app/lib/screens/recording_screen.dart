@@ -9,8 +9,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audio_service.dart';
 import '../services/message_service.dart';
+import '../models/recording_config.dart';
 
 /// 録音画面ウィジェット
 class RecordingScreen extends StatefulWidget {
@@ -35,6 +37,28 @@ class _RecordingScreenState extends State<RecordingScreen> {
   final AudioService _audioService = AudioService(); // オーディオサービスのインスタンス
   String? _thumbnailPath; // 選択されたサムネイル画像のパス
   final ImagePicker _imagePicker = ImagePicker(); // 画像選択用
+  RecordingQuality _currentQuality = RecordingQuality.medium; // 現在の録音品質
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecordingQuality();
+  }
+
+  // ========================================
+  // 録音品質設定を読み込む
+  // ========================================
+  Future<void> _loadRecordingQuality() async {
+    final prefs = await SharedPreferences.getInstance();
+    final qualityIndex = prefs.getInt('recording_quality') ?? 1; // デフォルト: medium
+    
+    setState(() {
+      _currentQuality = RecordingQuality.values[qualityIndex];
+    });
+    
+    // AudioServiceに品質を設定
+    _audioService.setQuality(_currentQuality);
+  }
 
   // ========================================
   // サムネイル画像を選択
@@ -196,8 +220,37 @@ class _RecordingScreenState extends State<RecordingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final config = RecordingConfig.fromQuality(_currentQuality);
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('ボイスメッセージを録音')),
+      appBar: AppBar(
+        title: const Text('ボイスメッセージを録音'),
+        actions: [
+          // 現在の録音品質を表示
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    '録音品質',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                  Text(
+                    config.displayName,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(

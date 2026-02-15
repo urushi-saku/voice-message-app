@@ -8,6 +8,7 @@
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import '../models/recording_config.dart';
 
 /// 音声の録音と再生を担当するサービスクラス
 class AudioService {
@@ -19,12 +20,25 @@ class AudioService {
   
   String? _recordingPath; // 録音中のファイルのパス
   bool _isRecording = false; // 録音中かどうか
+  RecordingQuality _quality = RecordingQuality.medium; // デフォルト品質
 
   // ========================================
   // ゲッター（状態を外部から取得）
   // ========================================
   bool get isRecording => _isRecording;
   String? get recordingPath => _recordingPath;
+  RecordingQuality get quality => _quality;
+
+  // ========================================
+  // 録音品質を設定
+  // ========================================
+  /// 録音品質を設定します
+  /// 
+  /// パラメータ:
+  ///   - quality: 設定する品質レベル
+  void setQuality(RecordingQuality quality) {
+    _quality = quality;
+  }
 
   // ========================================
   // 録音を開始
@@ -49,9 +63,16 @@ class AudioService {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         _recordingPath = '${directory.path}/voice_$timestamp.m4a';
 
-        // 録音を開始
+        // 録音品質設定を取得
+        final config = RecordingConfig.fromQuality(_quality);
+
+        // 録音を開始（品質設定を適用）
         await _recorder.start(
-          const RecordConfig(),
+          RecordConfig(
+            encoder: AudioEncoder.aacLc,
+            sampleRate: config.sampleRate,
+            bitRate: config.bitRate,
+          ),
           path: _recordingPath!,
         );
 

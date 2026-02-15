@@ -8,6 +8,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'edit_profile_screen.dart';
+import 'settings_screen.dart';
 
 /// プロフィール情報を表示・編集する画面
 class ProfilePage extends StatelessWidget {
@@ -16,7 +18,38 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('プロフィール'), elevation: 0),
+      appBar: AppBar(
+        title: const Text('プロフィール'),
+        elevation: 0,
+        actions: [
+          // 設定ボタン
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsScreen(),
+                ),
+              );
+            },
+            tooltip: '設定',
+          ),
+          // 編集ボタン
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EditProfileScreen(),
+                ),
+              );
+            },
+            tooltip: 'プロフィール編集',
+          ),
+        ],
+      ),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, _) {
           final user = authProvider.user;

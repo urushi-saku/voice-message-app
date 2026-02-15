@@ -3,7 +3,7 @@
 プロジェクト構成と実装ロードマップ
 ================================================================================
 
-更新日: 2026年2月11日
+更新日: 2026年2月15日
 プロジェクト根: /home/xiaox/voice-message-app
 
 【最新状況】
@@ -11,6 +11,8 @@
 フェーズ2（フォロワー機能強化）: 完了 ✅
 フェーズ3（メッセージング機能強化）: 完了 ✅
 フェーズ4（オフラインモード実装）: 完了 ✅
+フェーズ4（プロフィール機能強化）: 完了 ✅
+フェーズ4（録音品質設定）: 完了 ✅
 フェーズ5-7: 未着手
 
 
@@ -32,15 +34,34 @@ voice-message-app/
 │   │   └── Message.js                # メッセージモデル
 │   ├── controllers/                   # ビジネスロジック
 │   │   ├── authController.js         # 認証処理
-│   │   ├── userController.js         # ユーザー管理
+│   │   ├── userController.js         # ユーザー管理 ✅
+│   │   │   ├── searchUsers           # ユーザー検索
+│   │   │   ├── followUser            # フォロー
+│   │   │   ├── unfollowUser          # フォロー解除
+│   │   │   ├── getFollowers          # フォロワー一覧
+│   │   │   ├── getFollowing          # フォロー中一覧
+│   │   │   ├── getUserById           # ユーザー詳細取得
+│   │   │   ├── updateProfile         # プロフィール更新 ✅
+│   │   │   └── updateProfileImage    # プロフィール画像更新 ✅
 │   │   └── messageController.js      # メッセージ処理
 │   ├── routes/                        # APIルーティング
 │   │   ├── auth.js                   # 認証API
-│   │   ├── user.js                   # ユーザーAPI
+│   │   ├── user.js                   # ユーザーAPI ✅
+│   │   │   ├── GET /users/search     # ユーザー検索
+│   │   │   ├── PUT /users/profile    # プロフィール更新 ✅
+│   │   │   ├── PUT /users/profile/image # プロフィール画像更新 ✅
+│   │   │   ├── GET /users/:id        # ユーザー詳細
+│   │   │   ├── POST /users/:id/follow # フォロー
+│   │   │   ├── DELETE /users/:id/follow # フォロー解除
+│   │   │   ├── GET /users/:id/followers # フォロワー一覧
+│   │   │   └── GET /users/:id/following # フォロー中一覧
 │   │   └── message.js                # メッセージAPI
 │   ├── middleware/                    # ミドルウェア
 │   │   └── authMiddleware.js         # JWT認証
-│   └── uploads/                       # 音声ファイル保存ディレクトリ
+│   └── uploads/                       # ファイル保存ディレクトリ
+│       ├── *.m4a                     # 音声ファイル
+│       └── profiles/                 # プロフィール画像 ✅
+│           └── *.jpg, *.png          # 画像ファイル
 │
 └── voice_message_app/                 # Flutterモバイルアプリ
     ├── pubspec.yaml                   # Flutter依存パッケージ
@@ -78,7 +99,8 @@ voice-message-app/
     │   │   ├── recording_screen.dart # 録音画面 ✅
     │   │   │   ├── 音声録音UI
     │   │   │   ├── MessageService統合
-    │   │   │   └── 複数受信者への送信
+    │   │   │   ├── 複数受信者への送信
+    │   │   │   └── 録音品質表示 ✅
     │   │   │
     │   │   ├── select_follower_screen.dart # フォロワー選択画面 ✅
     │   │   │   ├── API連携フォロー一覧
@@ -104,15 +126,29 @@ voice-message-app/
     │   │   │   ├── ローディング/エラー表示
     │   │   │   └── 送信者情報表示
     │   │   │
-    │   │   └── profile_page.dart    # プロフィール画面 ✅
-    │   │       ├── ユーザー情報表示
-    │   │       ├── ログアウト機能
-    │   │       └── アプリ情報表示
+    │   │   ├── profile_page.dart    # プロフィール画面 ✅
+    │   │   │   ├── ユーザー情報表示
+    │   │   │   ├── ログアウト機能
+    │   │   │   ├── 編集ボタン ✅
+    │   │   │   └── 設定ボタン ✅
+    │   │   │
+    │   │   ├── edit_profile_screen.dart # プロフィール編集画面 ✅
+    │   │   │   ├── ユーザー名編集
+    │   │   │   ├── 自己紹介編集
+    │   │   │   ├── プロフィール画像選択
+    │   │   │   ├── 画像プレビュー
+    │   │   │   └── 保存機能
+    │   │   │
+    │   │   └── settings_screen.dart # 設定画面 ✅
+    │   │       ├── 録音品質選択
+    │   │       ├── 品質説明表示
+    │   │       └── 設定保存
     │   │
     │   ├── services/                 # ビジネスロジック層 ✅
     │   │   ├── audio_service.dart    # 音声録音・再生管理 ✅
     │   │   │   ├── startRecording()   # 録音開始
     │   │   │   ├── stopRecording()    # 録音停止
+    │   │   │   ├── setQuality()       # 録音品質設定 ✅
     │   │   │   ├── playAudio()        # 音声再生
     │   │   │   ├── pausePlayback()    # 再生一時停止
     │   │   │   └── dispose()          # リソース解放
@@ -132,7 +168,9 @@ voice-message-app/
     │   │   │   ├── followUser()       # フォロー
     │   │   │   ├── unfollowUser()     # アンフォロー
     │   │   │   ├── getFollowers()     # フォロワー一覧
-    │   │   │   └── getFollowing()     # フォロー中一覧
+    │   │   │   ├── getFollowing()     # フォロー中一覧
+    │   │   │   ├── updateProfile()    # プロフィール更新 ✅
+    │   │   │   └── updateProfileImage() # プロフィール画像更新 ✅
     │   │   │
     │   │   ├── message_service.dart  # メッセージサービス ✅
     │   │   │   ├── MessageInfoクラス
@@ -166,14 +204,19 @@ voice-message-app/
     │   │   └── api_service.dart      # サーバー通信管理（旧バージョン）
     │   │
     │   ├── models/                   # データモデル ✅
-    │   │   └── offline_model.dart    # オフラインデータモデル
-    │   │       ├── OfflineMessage      # 送信待機メッセージ
-    │   │       ├── CachedUserInfo      # ユーザーキャッシュ
-    │   │       ├── CachedMessageInfo   # メッセージキャッシュ
-    │   │       ├── CachedFollowInfo    # フォローキャッシュ
-    │   │       ├── OfflineConfig       # オフライン設定
-    │   │       ├── SyncStatistics      # 同期統計
-    │   │       └── SyncStatus          # 同期状態
+    │   │   ├── offline_model.dart    # オフラインデータモデル
+    │   │   │   ├── OfflineMessage      # 送信待機メッセージ
+    │   │   │   ├── CachedUserInfo      # ユーザーキャッシュ
+    │   │   │   ├── CachedMessageInfo   # メッセージキャッシュ
+    │   │   │   ├── CachedFollowInfo    # フォローキャッシュ
+    │   │   │   ├── OfflineConfig       # オフライン設定
+    │   │   │   ├── SyncStatistics      # 同期統計
+    │   │   │   └── SyncStatus          # 同期状態
+    │   │   │
+    │   │   └── recording_config.dart # 録音設定モデル ✅
+    │   │       ├── RecordingQuality    # 録音品質列挙型
+    │   │       ├── RecordingConfig     # 録音設定クラス
+    │   │       └── 品質プリセット（低・中・高）
     │   │
     │   ├── widgets/                  # 共通ウィジェット ✅
     │   │   └── offline_banner.dart   # オフラインバナー
@@ -203,6 +246,7 @@ voice-message-app/
 ✅ 基本的なUIフレームワーク（タブナビゲーション）
 ✅ 音声録音機能（マイク権限管理含む）
 ✅ 音声再生機能
+✅ 録音品質設定（低・中・高） ✅
 ✅ ユーザー認証（ログイン/登録）
 ✅ JWT トークン管理
 ✅ 認証状態管理（Provider）
@@ -217,6 +261,13 @@ voice-message-app/
 ✅ 相対時間表示（timeago）
 ✅ ファイルダウンロード＆ローカル再生
 ✅ プロフィール画面
+✅ プロフィール編集機能 ✅
+  ├── ✅ ユーザー名編集
+  ├── ✅ 自己紹介編集
+  ├── ✅ プロフィール画像選択・アップロード
+  └── ✅ リアルタイムプレビュー
+✅ 設定画面 ✅
+  └── ✅ 録音品質選択
 ✅ ログアウト機能
 ✅ リアルタイム再生時間表示
 ✅ ローディング/エラー状態管理
@@ -235,6 +286,8 @@ voice-message-app/
 ✅ JWT トークン認証
 ✅ bcrypt パスワード暗号化
 ✅ ユーザー検索API（GET /users/search）
+✅ プロフィール更新API（PUT /users/profile） ✅
+✅ プロフィール画像更新API（PUT /users/profile/image） ✅
 ✅ フォロー/アンフォローAPI（POST/DELETE /users/:id/follow）
 ✅ フォロワー/フォロー中一覧API（GET /users/:id/followers, /users/:id/following）
 ✅ メッセージ送信API（POST /messages/send）
@@ -243,7 +296,9 @@ voice-message-app/
 ✅ 既読マークAPI（PUT /messages/:id/read）
 ✅ メッセージ削除API（DELETE /messages/:id）
 ✅ ファイルダウンロードAPI（GET /messages/:id/download）
-✅ Multerを使用したファイルアップロード（10MB制限）
+✅ Multerを使用したファイルアップロード
+  ├── ✅ 音声ファイル（最大10MB）
+  └── ✅ プロフィール画像（最大5MB） ✅
 ✅ 認証ミドルウェア（protect）
 ✅ エラーハンドリング
 ✅ CORS設定
@@ -441,11 +496,24 @@ voice-message-app/
 │       ├── ⏳ キャッシュ読み込みテスト
 │       └── ⏳ UI表示テスト
 │
-├── 6.1 プロフィール機能強化 ⏳ 未実装
-│   ├── ⏳ プロフィール編集機能
-│   ├── ⏳ プロフィール画像アップロード
-│   ├── ⏳ 自己紹介編集
-│   └── ⏳ プロフィール表示の強化
+├── 6.1 プロフィール機能強化 ✅ 完了
+│   ├── ✅ プロフィール編集機能
+│   │   ├── ユーザー名編集
+│   │   ├── 自己紹介編集
+│   │   └── バリデーション機能
+│   ├── ✅ プロフィール画像アップロード
+│   │   ├── 画像選択（ギャラリーから）
+│   │   ├── 画像プレビュー
+│   │   ├── 画像圧縮（最大1024x1024、85%品質）
+│   │   └── サーバーへのアップロード
+│   ├── ✅ プロフィール表示の強化
+│   │   ├── プロフィール画像表示
+│   │   ├── フォロー情報表示
+│   │   └── 編集/設定ボタン追加
+│   └── ✅ バックエンドAPI実装
+│       ├── PUT /users/profile - プロフィール更新
+│       ├── PUT /users/profile/image - プロフィール画像更新
+│       └── 画像ファイル管理（uploads/profiles/）
 │
 ├── 6.2 音声フィルター・エフェクト ⏳ 未実装
 │   ├── 音量調整
@@ -453,28 +521,34 @@ voice-message-app/
 │   ├── エコー/リバーブエフェクト
 │   └── ボイスチェンジャー機能
 │
-├── 6.2 グループメッセージング
+├── 6.3 グループメッセージング ⏳ 未実装
 │   ├── グループ作成機能
 │   ├── グループ内メッセージ送受信
 │   ├── グループメンバー管理
 │   └── グループプロフィール
 │
-├── 6.3 リアクション機能
+├── 6.4 リアクション機能 ⏳ 未実装
 │   ├── メッセージへのリアクション（絵文字など）
 │   ├── リアクション一覧表示
 │   ├── リアクション削除機能
 │   └── リアクション通知
 │
-├── 6.4 録音品質設定
-│   ├── ビットレート選択
-│   ├── サンプリングレート設定
-│   ├── 音声フォーマット選択
-│   └── ファイルサイズ表示
-│
-└── 6.5 オフラインモード
-    ├── ローカルメッセージ保存
-    ├── 接続復帰時の同期
-    └── オフライン表示機能
+└── 6.5 録音品質設定 ✅ 完了
+    ├── ✅ 録音品質モデル作成（recording_config.dart）
+    │   ├── 低品質（16kHz、32kbps）
+    │   ├── 中品質（22.05kHz、64kbps）- デフォルト
+    │   └── 高品質（44.1kHz、128kbps）
+    ├── ✅ AudioServiceへの統合
+    │   ├── 品質設定の適用
+    │   └── RecordConfig設定
+    ├── ✅ 設定画面UI実装（settings_screen.dart）
+    │   ├── 品質選択ラジオボタン
+    │   ├── 品質説明表示
+    │   ├── 推定ファイルサイズ表示
+    │   └── SharedPreferencesへの保存
+    └── ✅ RecordingScreen統合
+        ├── 品質設定の読み込み
+        └── 現在の品質表示
 
 【フェーズ5：セキュリティ・パフォーマンス（優先度：中）】
 ┌─────────────────────────────────────────────────────────────────

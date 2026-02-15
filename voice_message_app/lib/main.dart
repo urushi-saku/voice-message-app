@@ -57,7 +57,6 @@ void main() async {
   try {
     // Firebase初期化
     // FlutterFire CLI使用時は options: DefaultFirebaseOptions.currentPlatform を追加
-    await Firebase.initializeApp();
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );

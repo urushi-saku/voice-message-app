@@ -5,6 +5,7 @@
 // バックエンドAPIと通信する機能を提供します
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
@@ -208,6 +209,96 @@ class UserService {
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'フォロー中リストの取得に失敗しました');
+    }
+  }
+
+  /// ========================================
+  /// プロフィール更新
+  /// PUT /users/profile
+  /// ========================================
+  /// 【パラメータ】
+  /// - username: 新しいユーザー名（オプション）
+  /// - bio: 新しい自己紹介（オプション）
+  ///
+  /// 【処理フロー】
+  /// ①保存されているJWTトークンを取得
+  /// ②PUT リクエスト送信（JSONボディ付き）
+  /// ③更新されたユーザー情報を返す
+  /// ④エラー時は例外をスロー
+  static Future<UserInfo> updateProfile({
+    String? username,
+    String? bio,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('認証が必要です');
+    }
+
+    final Map<String, dynamic> body = {};
+    if (username != null) body['username'] = username;
+    if (bio != null) body['bio'] = bio;
+
+    if (body.isEmpty) {
+      throw Exception('更新する情報がありません');
+    }
+
+    final response = await http.put(
+      Uri.parse('$BASE_URL/users/profile'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return UserInfo.fromJson(data['user']);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'プロフィールの更新に失敗しました');
+    }
+  }
+
+  /// ========================================
+  /// プロフィール画像更新
+  /// PUT /users/profile/image
+  /// ========================================
+  /// 【パラメータ】
+  /// - imageFile: アップロードする画像ファイル
+  ///
+  /// 【処理フロー】
+  /// ①保存されているJWTトークンを取得
+  /// ②MultipartRequestを作成
+  /// ③画像ファイルを添付
+  /// ④リクエスト送信
+  /// ⑤更新されたユーザー情報を返す
+  /// ⑥エラー時は例外をスロー
+  static Future<UserInfo> updateProfileImage(File imageFile) async {
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('認証が必要です');
+    }
+
+    final request = http.MultipartRequest(
+      'PUT',
+      Uri.parse('$BASE_URL/users/profile/image'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      await http.MultipartFile.fromPath('image', imageFile.path),
+    );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return UserInfo.fromJson(data['user']);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'プロフィール画像の更新に失敗しました');
     }
   }
 }
