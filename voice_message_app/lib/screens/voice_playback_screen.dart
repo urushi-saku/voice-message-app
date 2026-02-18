@@ -3,11 +3,13 @@
 // ========================================
 // 初学者向け説明：
 // このファイルは、受信したボイスメッセージを再生するための画面です
-// サムネイル、再生バー、再生/停止ボタンを表示します
+// サムネイル、再生バー、再生/停止ボタン、音声エフェクトパネルを表示します
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../services/message_service.dart';
+import '../models/audio_effects.dart';
+import '../widgets/audio_effects_panel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -28,6 +30,12 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
   String? _localFilePath;
+
+  // ========================================
+  // エフェクト関連の状態
+  // ========================================
+  AudioEffects _effects = AudioEffects.defaultEffects;
+  bool _showEffectsPanel = false;
 
   @override
   void initState() {
@@ -123,6 +131,24 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
       await _player.pause();
     } else {
       await _player.play(DeviceFileSource(_localFilePath!));
+      // 再生開始時にエフェクトを適用
+      await _applyEffects(_effects);
+    }
+  }
+
+  // ========================================
+  // エフェクトを適用してプレイヤーに設定
+  // ========================================
+  Future<void> _applyEffects(AudioEffects newEffects) async {
+    setState(() => _effects = newEffects);
+    try {
+      await _player.setVolume(_effects.volume);
+      final speedWithPitch =
+          (_effects.playbackSpeed * _effects.pitchType.pitchFactor)
+              .clamp(0.5, 2.0);
+      await _player.setPlaybackRate(speedWithPitch);
+    } catch (e) {
+      print('エフェクト適用エラー: $e');
     }
   }
 
@@ -142,6 +168,23 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.black,
+        actions: [
+          // エフェクトパネル表示/非表示トグルボタン
+          IconButton(
+            icon: Icon(
+              Icons.tune,
+              color: _showEffectsPanel || _effects.hasEffects
+                  ? Colors.deepPurple
+                  : Colors.grey,
+            ),
+            tooltip: 'エフェクト設定',
+            onPressed: () {
+              setState(() {
+                _showEffectsPanel = !_showEffectsPanel;
+              });
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -161,7 +204,7 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                 ],
               ),
             )
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -225,6 +268,26 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(_formatDuration(_position)),
+                        // 現在のエフェクト状態表示
+                        if (_effects.pitchType != PitchType.normal ||
+                            _effects.playbackSpeed != 1.0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.deepPurple.shade50,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _effects.pitchType != PitchType.normal
+                                  ? _effects.pitchType.emoji
+                                  : _effects.speedLabel,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.deepPurple,
+                              ),
+                            ),
+                          ),
                         Text(_formatDuration(_duration)),
                       ],
                     ),
@@ -233,17 +296,66 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                   const SizedBox(height: 32),
 
                   // ========================================
-                  // 再生・停止ボタン
+                  // 再生コントロールボタン群
                   // ========================================
-                  IconButton(
-                    iconSize: 80,
-                    icon: Icon(
-                      _isPlaying
-                          ? Icons.pause_circle_filled
-                          : Icons.play_circle_filled,
-                      color: Colors.deepPurple,
-                    ),
-                    onPressed: _togglePlay,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // 5秒戻る
+                      IconButton(
+                        iconSize: 40,
+                        icon: const Icon(Icons.replay_5),
+                        color: Colors.grey.shade600,
+                        onPressed: () async {
+                          final newPos =
+                              _position - const Duration(seconds: 5);
+                          await _player.seek(newPos < Duration.zero
+                              ? Duration.zero
+                              : newPos);
+                        },
+                      ),
+                      const SizedBox(width: 16),
+                      // メイン再生/停止ボタン
+                      IconButton(
+                        iconSize: 80,
+                        icon: Icon(
+                          _isPlaying
+                              ? Icons.pause_circle_filled
+                              : Icons.play_circle_filled,
+                          color: Colors.deepPurple,
+                        ),
+                        onPressed: _togglePlay,
+                      ),
+                      const SizedBox(width: 16),
+                      // 5秒進む
+                      IconButton(
+                        iconSize: 40,
+                        icon: const Icon(Icons.forward_5),
+                        color: Colors.grey.shade600,
+                        onPressed: () async {
+                          final newPos =
+                              _position + const Duration(seconds: 5);
+                          await _player.seek(
+                              newPos > _duration ? _duration : newPos);
+                        },
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // ========================================
+                  // 音声エフェクトパネル（折りたたみ式）
+                  // ========================================
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _showEffectsPanel
+                        ? AudioEffectsPanel(
+                            key: const ValueKey('panel'),
+                            effects: _effects,
+                            onEffectsChanged: _applyEffects,
+                          )
+                        : const SizedBox.shrink(key: ValueKey('empty')),
                   ),
                 ],
               ),
