@@ -4,6 +4,7 @@
 // プッシュ通知を送信するためのFirebase設定
 
 const admin = require('firebase-admin');
+const path = require('path');
 
 // Firebase Admin SDKの初期化
 // 初学者向け説明：
@@ -21,7 +22,15 @@ let firebaseApp;
 
 try {
   // 環境変数からFirebase秘密鍵のパスを取得
-  const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || './config/serviceAccountKey.json';
+  let serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+
+  if (serviceAccountPath) {
+    // 環境変数がある場合、プロジェクトルートからのパスとして解決
+    serviceAccountPath = path.resolve(process.cwd(), serviceAccountPath);
+  } else {
+    // 環境変数がない場合、このファイルと同じディレクトリにある 'serviceAccountKey.json' を探す
+    serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
+  }
   
   // サービスアカウント秘密鍵の読み込み
   const serviceAccount = require(serviceAccountPath);

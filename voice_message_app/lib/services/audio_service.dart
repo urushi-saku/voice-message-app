@@ -68,7 +68,8 @@ class AudioService {
       await _player.setVolume(_effects.volume);
 
       // 再生速度を適用（ピッチタイプによって速度を調整）
-      final speedWithPitch = _effects.playbackSpeed * _effects.pitchType.pitchFactor;
+      final speedWithPitch =
+          _effects.playbackSpeed * _effects.pitchType.pitchFactor;
       await _player.setPlaybackRate(speedWithPitch.clamp(0.5, 2.0));
     } catch (e) {
       print('エフェクト適用エラー: $e');

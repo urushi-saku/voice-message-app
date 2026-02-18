@@ -144,8 +144,10 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
     try {
       await _player.setVolume(_effects.volume);
       final speedWithPitch =
-          (_effects.playbackSpeed * _effects.pitchType.pitchFactor)
-              .clamp(0.5, 2.0);
+          (_effects.playbackSpeed * _effects.pitchType.pitchFactor).clamp(
+            0.5,
+            2.0,
+          );
       await _player.setPlaybackRate(speedWithPitch);
     } catch (e) {
       print('エフェクト適用エラー: $e');
@@ -273,7 +275,9 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                             _effects.playbackSpeed != 1.0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.deepPurple.shade50,
                               borderRadius: BorderRadius.circular(4),
@@ -307,11 +311,10 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                         icon: const Icon(Icons.replay_5),
                         color: Colors.grey.shade600,
                         onPressed: () async {
-                          final newPos =
-                              _position - const Duration(seconds: 5);
-                          await _player.seek(newPos < Duration.zero
-                              ? Duration.zero
-                              : newPos);
+                          final newPos = _position - const Duration(seconds: 5);
+                          await _player.seek(
+                            newPos < Duration.zero ? Duration.zero : newPos,
+                          );
                         },
                       ),
                       const SizedBox(width: 16),
@@ -333,10 +336,10 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
                         icon: const Icon(Icons.forward_5),
                         color: Colors.grey.shade600,
                         onPressed: () async {
-                          final newPos =
-                              _position + const Duration(seconds: 5);
+                          final newPos = _position + const Duration(seconds: 5);
                           await _player.seek(
-                              newPos > _duration ? _duration : newPos);
+                            newPos > _duration ? _duration : newPos,
+                          );
                         },
                       ),
                     ],

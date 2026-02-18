@@ -94,9 +94,9 @@ class AudioEffectsPanel extends StatelessWidget {
           Text(
             '音声エフェクト',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple,
-                ),
+              fontWeight: FontWeight.bold,
+              color: Colors.deepPurple,
+            ),
           ),
           if (effects.hasEffects) ...[
             const SizedBox(width: 8),
@@ -218,10 +218,12 @@ class AudioEffectsPanel extends StatelessWidget {
                 onEffectsChanged(effects.copyWith(playbackSpeed: speed));
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color:
-                      isSelected ? Colors.deepPurple : Colors.grey.shade200,
+                  color: isSelected ? Colors.deepPurple : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -319,7 +321,11 @@ class AudioEffectsPanel extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 18, color: enabled ? Colors.deepPurple : Colors.grey),
+            Icon(
+              icon,
+              size: 18,
+              color: enabled ? Colors.deepPurple : Colors.grey,
+            ),
             const SizedBox(width: 8),
             Text(
               '$emoji $label',
@@ -418,7 +424,11 @@ class AudioEffectsPanel extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 14, color: Colors.deepPurple),
+                const Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Colors.deepPurple,
+                ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(

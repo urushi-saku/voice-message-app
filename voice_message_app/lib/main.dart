@@ -141,6 +141,7 @@ class MyApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(
             seedColor: Colors.deepPurple,
           ), // 色のテーマ（deepPurpleを基調）
+          fontFamily: 'Noto Sans CJK JP', // システムにインストールされた日本語フォントを使用
         ),
         // ② 起動時に表示する画面 → AuthWrapper
         // AuthWrapperが認証状態を確認して適切な画面を表示

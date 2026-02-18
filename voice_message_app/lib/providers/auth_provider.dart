@@ -235,6 +235,29 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ========================================
+  // ユーザー情報を再読み込み
+  // ========================================
+  /// サーバーからユーザー情報を再取得して保存
+  Future<void> loadUserInfo() async {
+    try {
+      final userInfo = await AuthService.getMe();
+      _user = User(
+        id: userInfo['_id'] ?? _user?.id ?? '',
+        username: userInfo['username'] ?? _user?.username ?? '',
+        email: userInfo['email'] ?? _user?.email ?? '',
+        profileImage: userInfo['profileImage'] ?? _user?.profileImage,
+        bio: userInfo['bio'] ?? _user?.bio ?? '',
+        followersCount: userInfo['followersCount'] ?? _user?.followersCount ?? 0,
+        followingCount: userInfo['followingCount'] ?? _user?.followingCount ?? 0,
+      );
+      notifyListeners();
+    } catch (e) {
+      _error = 'ユーザー情報の取得に失敗しました';
+      notifyListeners();
+    }
+  }
+
+  // ========================================
   // ユーザーログアウト
   // ========================================
   /// ログアウト処理

@@ -4,6 +4,7 @@
 // メッセージ送信、受信リスト取得、既読管理などの
 // バックエンドAPIと通信する機能を提供します
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -231,7 +232,7 @@ class MessageService {
     final fileSize = fileStat.size;
 
     // 現在のユーザーIDを取得
-    final currentUserId = await AuthService.getMe().then((user) => user.id);
+    final currentUserId = await AuthService.getMe().then((user) => user['_id'] ?? user['id']);
 
     // オフラインメッセージオブジェクトを作成
     final offlineMessage = OfflineMessage(
