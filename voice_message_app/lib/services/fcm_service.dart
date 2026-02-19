@@ -5,9 +5,21 @@
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+/// 通知チャンネル定義
+const AndroidNotificationChannel _channel = AndroidNotificationChannel(
+  'voice_messages',
+  'ボイスメッセージ',
+  description: '音声メッセージとテキストメッセージの通知',
+  importance: Importance.max,
+);
+
+final FlutterLocalNotificationsPlugin _localNotifications =
+    FlutterLocalNotificationsPlugin();
 
 /// バックグラウンド通知ハンドラー
 /// アプリが終了している状態で通知が来た時に実行される
@@ -26,13 +38,28 @@ class FcmService {
   /// FCMサービスの初期化
   /// ========================================
   /// 【処理フロー】
-  /// ①通知権限をリクエスト
-  /// ②FCMトークンを取得
-  /// ③サーバーにトークンを送信
-  /// ④通知リスナーを設定
+  /// ①flutter_local_notificationsの初期化＋Androidチャンネル作成
+  /// ②通知権限をリクエスト
+  /// ③FCMトークンを取得
+  /// ④サーバーにトークンを送信
+  /// ⑤通知リスナーを設定
   static Future<void> initialize() async {
     try {
-      // ①通知権限をリクエスト
+      // ① flutter_local_notifications 初期化
+      const AndroidInitializationSettings androidSettings =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
+      const InitializationSettings initSettings =
+          InitializationSettings(android: androidSettings);
+      await _localNotifications.initialize(initSettings);
+
+      // Android 8+ (API 26+) 向けに通知チャンネルを作成
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(_channel);
+
+      print('✅ 通知チャンネル "voice_messages" を作成しました');
+      // ②通知権限をリクエスト
       NotificationSettings settings = await _firebaseMessaging
           .requestPermission(
             alert: true,
@@ -147,18 +174,35 @@ class FcmService {
   }
 
   /// ========================================
-  /// 通知を受信した時の処理
+  /// 通知を受信した時の処理（フォアグラウンド）
   /// ========================================
   static void _handleNotification(RemoteMessage message) {
-    // ここで通知を受信した時の処理を実装
-    // 例：ローカル通知表示、バッジ更新、UI更新など
-
     if (kDebugMode) {
       print('🔔 通知内容:');
       print('  - タイトル: ${message.notification?.title}');
       print('  - 本文: ${message.notification?.body}');
       print('  - データ: ${message.data}');
     }
+
+    final notification = message.notification;
+    if (notification == null) return;
+
+    // フォアグラウンド時にローカル通知として表示
+    _localNotifications.show(
+      message.hashCode,
+      notification.title,
+      notification.body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _channel.id,
+          _channel.name,
+          channelDescription: _channel.description,
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+    );
   }
 
   /// ========================================

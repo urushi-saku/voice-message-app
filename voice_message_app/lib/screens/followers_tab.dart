@@ -369,7 +369,10 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         title: Text(user.username),
                         subtitle: Text(
                           '@${user.handle}',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
                         ),
                         trailing: ElevatedButton(
                           onPressed: () => _toggleFollow(user, isFollowing),

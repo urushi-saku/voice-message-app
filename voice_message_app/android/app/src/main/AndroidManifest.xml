@@ -27,6 +27,9 @@
          用途: 音声ファイルをサーバーにアップロードしたり、サーバーから音声ファイルを
                ダウンロードしたりするときに使用 -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- POST_NOTIFICATIONS: Android 13+ (API 33+) で通知を表示するための許可 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <application
         android:label="voice_message_app"
@@ -59,6 +62,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- FCMのデフォルト通知チャンネルIDを指定 -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="voice_messages" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

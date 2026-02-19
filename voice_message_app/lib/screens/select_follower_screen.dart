@@ -72,9 +72,7 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('トーク相手を選択'),
-      ),
+      appBar: AppBar(title: const Text('トーク相手を選択')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -98,10 +96,7 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
                 children: [
                   Icon(Icons.people_outline, size: 64, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text(
-                    'フォロー中のユーザーがいません',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+                  Text('フォロー中のユーザーがいません', style: TextStyle(color: Colors.grey)),
                 ],
               ),
             )

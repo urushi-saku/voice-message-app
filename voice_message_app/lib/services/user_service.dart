@@ -228,7 +228,11 @@ class UserService {
   /// ②PUT リクエスト送信（JSONボディ付き）
   /// ③更新されたユーザー情報を返す
   /// ④エラー時は例外をスロー
-  static Future<UserInfo> updateProfile({String? username, String? handle, String? bio}) async {
+  static Future<UserInfo> updateProfile({
+    String? username,
+    String? handle,
+    String? bio,
+  }) async {
     final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('認証が必要です');

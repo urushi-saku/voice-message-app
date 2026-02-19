@@ -99,13 +99,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       // ユーザー名またはhandleまたは自己紹介が変更されている場合は更新
       final usernameChanged = _usernameController.text != currentUser.username;
-      final handleChanged = _handleController.text.toLowerCase().trim() != currentUser.handle;
+      final handleChanged =
+          _handleController.text.toLowerCase().trim() != currentUser.handle;
       final bioChanged = _bioController.text != currentUser.bio;
 
       if (usernameChanged || handleChanged || bioChanged) {
         await UserService.updateProfile(
           username: usernameChanged ? _usernameController.text : null,
-          handle: handleChanged ? _handleController.text.toLowerCase().trim() : null,
+          handle: handleChanged
+              ? _handleController.text.toLowerCase().trim()
+              : null,
           bio: bioChanged ? _bioController.text : null,
         );
       }
