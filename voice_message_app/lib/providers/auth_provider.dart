@@ -21,6 +21,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/fcm_service.dart';
 
 /// ユーザー情報を表すクラス
 /// 【メンバー変数】
@@ -148,6 +149,9 @@ class AuthProvider extends ChangeNotifier {
 
         // ユーザー情報を取得
         await _fetchUserInfo();
+
+        // FCMトークンをサーバーに登録（再起動時も最新トークンを保存）
+        FcmService.sendTokenAfterLogin();
       }
     } catch (e) {
       _isAuthenticated = false;
@@ -196,6 +200,9 @@ class AuthProvider extends ChangeNotifier {
       _isAuthenticated = true;
       _isLoading = false;
       notifyListeners();
+
+      // FCMトークンをサーバーに登録（登録直後）
+      FcmService.sendTokenAfterLogin();
       return true;
     } catch (e) {
       _error = e.toString();
@@ -222,6 +229,9 @@ class AuthProvider extends ChangeNotifier {
       _isAuthenticated = true;
       _isLoading = false;
       notifyListeners();
+
+      // FCMトークンをサーバーに登録（ログイン直後）
+      FcmService.sendTokenAfterLogin();
       return true;
     } catch (e) {
       _error = e.toString();

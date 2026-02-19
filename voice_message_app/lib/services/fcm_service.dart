@@ -137,6 +137,23 @@ class FcmService {
   }
 
   /// ========================================
+  /// ログイン後にFCMトークンをサーバーへ送信（公開メソッド）
+  /// ========================================
+  /// ログイン・登録・アプリ起動時（既ログイン）に呼び出す
+  static Future<void> sendTokenAfterLogin() async {
+    try {
+      final token = await _firebaseMessaging.getToken();
+      if (token == null) {
+        print('⚠️  FCMトークンを取得できません');
+        return;
+      }
+      await _sendTokenToServer(token);
+    } catch (e) {
+      print('❌ ログイン後FCMトークン送信エラー: $e');
+    }
+  }
+
+  /// ========================================
   /// 通知リスナーを設定
   /// ========================================
   static void _setupNotificationListeners() {
