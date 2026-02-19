@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'edit_profile_screen.dart';
+import 'followers_tab.dart';
 import 'settings_screen.dart';
 
 /// プロフィール情報を表示・編集する画面
@@ -118,49 +119,67 @@ class ProfilePage extends StatelessWidget {
                   ],
 
                   // ========================================
-                  // フォロー情報
+                  // フォロー情報（タップでフォロワー画面へ）
                   // ========================================
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      Column(
-                        children: [
-                          Text(
-                            user.followersCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const FollowersTab(initialTabIndex: 0),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'フォロワー',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              user.followersCount.toString(),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'フォロワー',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       Container(width: 1, height: 40, color: Colors.grey[300]),
-                      Column(
-                        children: [
-                          Text(
-                            user.followingCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const FollowersTab(initialTabIndex: 1),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'フォロー中',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              user.followingCount.toString(),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'フォロー中',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

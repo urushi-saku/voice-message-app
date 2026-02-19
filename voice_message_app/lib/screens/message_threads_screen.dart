@@ -5,6 +5,7 @@
 
 import 'package:flutter/material.dart';
 import '../services/message_service.dart';
+import 'select_follower_screen.dart';
 import 'thread_detail_screen.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -237,6 +238,15 @@ class _MessageThreadsScreenState extends State<MessageThreadsScreen> {
                 },
               ),
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SelectFollowerScreen()),
+        ).then((_) => _loadThreads()),
+        backgroundColor: Colors.deepPurple,
+        tooltip: 'メッセージを送る',
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 }

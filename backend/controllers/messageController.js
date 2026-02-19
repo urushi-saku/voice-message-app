@@ -130,6 +130,77 @@ exports.sendMessage = async (req, res) => {
 };
 
 // ========================================
+// テキストメッセージ送信
+// POST /messages/send-text
+// ========================================
+exports.sendTextMessage = async (req, res) => {
+  try {
+    const senderId = req.user.id;
+    const { receivers, textContent } = req.body;
+
+    if (!textContent || !textContent.trim()) {
+      return res.status(400).json({ error: 'テキストを入力してください' });
+    }
+    if (!receivers) {
+      return res.status(400).json({ error: '受信者を指定してください' });
+    }
+
+    let receiverIds;
+    try {
+      receiverIds = typeof receivers === 'string' ? JSON.parse(receivers) : receivers;
+    } catch (e) {
+      return res.status(400).json({ error: '受信者リストの形式が不正です' });
+    }
+
+    if (!Array.isArray(receiverIds) || receiverIds.length === 0) {
+      return res.status(400).json({ error: '受信者を少なくとも1人選択してください' });
+    }
+
+    const readStatus = receiverIds.map(id => ({
+      user: id,
+      isRead: false,
+      readAt: null
+    }));
+
+    const newMessage = new Message({
+      sender: senderId,
+      receivers: receiverIds,
+      messageType: 'text',
+      textContent: textContent.trim(),
+      readStatus
+    });
+
+    await newMessage.save();
+
+    // プッシュ通知
+    const sender = await User.findById(senderId).select('username');
+    const receiversData = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
+    const fcmTokens = receiversData.map(r => r.fcmToken).filter(Boolean);
+    if (fcmTokens.length > 0) {
+      try {
+        await sendPushNotificationToMultiple(
+          fcmTokens,
+          {
+            title: `${sender.username}から新しいメッセージ`,
+            body: textContent.trim().length > 50
+                ? textContent.trim().slice(0, 50) + '...'
+                : textContent.trim(),
+          },
+          { messageId: newMessage._id.toString(), senderId, type: 'new_message' }
+        );
+      } catch (e) {
+        console.error('プッシュ通知送信エラー:', e);
+      }
+    }
+
+    res.status(201).json({ message: 'テキストメッセージを送信しました', messageId: newMessage._id });
+  } catch (error) {
+    console.error('テキストメッセージ送信エラー:', error);
+    res.status(500).json({ error: 'テキストメッセージの送信に失敗しました' });
+  }
+};
+
+// ========================================
 // 受信メッセージリスト取得
 // GET /messages/received
 // ========================================
@@ -486,54 +557,81 @@ exports.getMessageThreads = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // 自分宛てのメッセージを取得（削除されていないもの）
+    // 自分が送信または受信したメッセージを全取得
     const messages = await Message.find({
-      receivers: userId,
-      isDeleted: false
+      isDeleted: false,
+      $or: [
+        { receivers: userId },
+        { sender: userId }
+      ]
     })
       .populate('sender', 'username profileImage')
+      .populate('receivers', 'username profileImage')
       .sort({ sentAt: -1 });
 
-    // 送信者ごとにグループ化
+    // 相手ユーザーごとにグループ化
     const threadsMap = new Map();
 
     messages.forEach(message => {
       const senderId = message.sender._id.toString();
-      
-      if (!threadsMap.has(senderId)) {
-        // このスレッドの未読数を計算
+      const isMine = senderId === userId;
+
+      // 相手のIDを特定
+      let partnerId, partnerUsername, partnerProfileImage;
+      if (isMine) {
+        // 自分が送った → 受信者が相手（複数の場合は最初の1人）
+        const partner = message.receivers.find(r => r._id.toString() !== userId);
+        if (!partner) return;
+        partnerId = partner._id.toString();
+        partnerUsername = partner.username;
+        partnerProfileImage = partner.profileImage;
+      } else {
+        // 相手が送ってきた → 送信者が相手
+        partnerId = senderId;
+        partnerUsername = message.sender.username;
+        partnerProfileImage = message.sender.profileImage;
+      }
+
+      if (!threadsMap.has(partnerId)) {
+        // 未読数（受信したメッセージのみカウント）
         const unreadCount = messages.filter(m => {
-          if (m.sender._id.toString() !== senderId) return false;
-          const readStatus = m.readStatus.find(rs => rs.user.toString() === userId);
-          return readStatus ? !readStatus.isRead : true;
+          if (m.sender._id.toString() !== partnerId) return false;
+          if (!m.receivers.some(r => r._id.toString() === userId)) return false;
+          const rs = m.readStatus.find(rs => rs.user.toString() === userId);
+          return rs ? !rs.isRead : true;
         }).length;
 
-        // このスレッドの総数を計算
-        const totalCount = messages.filter(m => 
-          m.sender._id.toString() === senderId
-        ).length;
+        const totalCount = messages.filter(m => {
+          const mid = m.sender._id.toString();
+          const hasPartner = m.receivers.some(r => r._id.toString() === partnerId);
+          const hasMe    = m.receivers.some(r => r._id.toString() === userId);
+          return (mid === partnerId && hasMe) || (mid === userId && hasPartner);
+        }).length;
 
-        threadsMap.set(senderId, {
+        const readStatus = isMine ? null : message.readStatus.find(rs => rs.user.toString() === userId);
+        threadsMap.set(partnerId, {
           sender: {
-            _id: message.sender._id,
-            username: message.sender.username,
-            profileImage: message.sender.profileImage
+            _id: partnerId,
+            username: partnerUsername,
+            profileImage: partnerProfileImage
           },
           lastMessage: {
             _id: message._id,
             sentAt: message.sentAt,
             duration: message.duration,
-            isRead: message.readStatus.find(rs => rs.user.toString() === userId)?.isRead || false
+            messageType: message.messageType || 'voice',
+            textContent: message.textContent || null,
+            isMine,
+            isRead: isMine ? true : (readStatus ? readStatus.isRead : false)
           },
-          unreadCount: unreadCount,
-          totalCount: totalCount,
+          unreadCount,
+          totalCount,
           lastMessageAt: message.sentAt
         });
       }
     });
 
-    // Map を配列に変換し、最新メッセージ順にソート
-    const threads = Array.from(threadsMap.values()).sort((a, b) => 
+    const threads = Array.from(threadsMap.values()).sort((a, b) =>
       new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
     );
 
@@ -545,27 +643,31 @@ exports.getMessageThreads = async (req, res) => {
 };
 
 // ========================================
-// 特定の送信者からのメッセージ取得
-// GET /messages/thread/:senderId
+// 特定の送信者からのメッセージ取得（双方向）
+// GET /messages/thread/:partnerId
 // ========================================
-// 指定した送信者からの全メッセージを取得します
+// 指定ユーザーとの会話（送受信両方）を取得します
 exports.getThreadMessages = async (req, res) => {
   try {
     const userId = req.user.id;
-    const senderId = req.params.senderId;
+    const partnerId = req.params.senderId;
 
-    // 指定した送信者からの自分宛てメッセージを取得
+    // 自分 → 相手、または 相手 → 自分のメッセージを取得
     const messages = await Message.find({
-      sender: senderId,
-      receivers: userId,
-      isDeleted: false
+      isDeleted: false,
+      $or: [
+        { sender: userId,   receivers: partnerId },
+        { sender: partnerId, receivers: userId   }
+      ]
     })
       .populate('sender', 'username profileImage')
-      .sort({ sentAt: -1 });
+      .sort({ sentAt: 1 }); // 古い順（チャット表示用）
 
-    // レスポンスを整形
     const result = messages.map(message => {
-      const readStatus = message.readStatus.find(rs => rs.user.toString() === userId);
+      const isMine = message.sender._id.toString() === userId;
+      const readStatus = isMine
+        ? null
+        : message.readStatus.find(rs => rs.user.toString() === userId);
       return {
         _id: message._id,
         sender: {
@@ -573,12 +675,15 @@ exports.getThreadMessages = async (req, res) => {
           username: message.sender.username,
           profileImage: message.sender.profileImage
         },
+        isMine,
+        messageType: message.messageType || 'voice',
+        textContent: message.textContent || null,
         filePath: message.filePath,
         fileSize: message.fileSize,
         duration: message.duration,
         mimeType: message.mimeType,
         sentAt: message.sentAt,
-        isRead: readStatus ? readStatus.isRead : false,
+        isRead: isMine ? true : (readStatus ? readStatus.isRead : false),
         readAt: readStatus ? readStatus.readAt : null
       };
     });

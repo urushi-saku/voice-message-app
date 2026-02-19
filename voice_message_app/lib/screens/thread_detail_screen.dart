@@ -1,15 +1,14 @@
 // ========================================
-// スレッド詳細画面（特定の相手とのメッセージ一覧）
+// スレッド詳細画面（チャットUI）
 // ========================================
-// 特定の送信者からのメッセージを一覧表示し、
-// リスト表示とカード表示を切り替えできます
 
 import 'package:flutter/material.dart';
 import '../services/message_service.dart';
+import 'recording_screen.dart';
 import 'voice_playback_screen.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-/// スレッド詳細画面
+/// スレッド詳細画面（チャット形式）
 class ThreadDetailScreen extends StatefulWidget {
   final String senderId;
   final String senderUsername;
@@ -27,13 +26,13 @@ class ThreadDetailScreen extends StatefulWidget {
 }
 
 class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
-  // ========================================
-  // 状態変数
-  // ========================================
   List<MessageInfo> _messages = [];
   bool _isLoading = true;
   String? _error;
-  bool _isGridView = false; // false: リスト表示, true: カード表示
+  bool _isSending = false;
+
+  final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -42,22 +41,28 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     _loadMessages();
   }
 
+  @override
+  void dispose() {
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   // ========================================
-  // メッセージを読み込み
+  // メッセージ読み込み
   // ========================================
   Future<void> _loadMessages() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
-
     try {
       final messages = await MessageService.getThreadMessages(widget.senderId);
-
       setState(() {
         _messages = messages;
         _isLoading = false;
       });
+      _scrollToBottom();
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -66,338 +71,209 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     }
   }
 
-  // ========================================
-  // メッセージを既読にする
-  // ========================================
-  Future<void> _markAsRead(MessageInfo message) async {
-    if (!message.isRead) {
-      try {
-        await MessageService.markAsRead(message.id);
-        _loadMessages();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('既読更新エラー: ${e.toString()}')));
-        }
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
+    });
+  }
+
+  // ========================================
+  // テキストメッセージ送信
+  // ========================================
+  Future<void> _sendText() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    _textController.clear();
+    setState(() => _isSending = true);
+    try {
+      await MessageService.sendTextMessage(
+        receiverIds: [widget.senderId],
+        textContent: text,
+      );
+      await _loadMessages();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('送信失敗: ${e.toString()}')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
   // ========================================
-  // 音声再生画面を開く
+  // 音声メッセージ再生
   // ========================================
-  void _openPlaybackScreen(MessageInfo message) {
-    _markAsRead(message);
+  void _openPlayback(MessageInfo message) {
+    if (!message.isRead && !message.isMine) {
+      MessageService.markAsRead(message.id).then((_) => _loadMessages());
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => VoicePlaybackScreen(message: message)),
+    );
+  }
 
+  // ========================================
+  // ボイスメッセージ録音
+  // ========================================
+  void _openRecording() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VoicePlaybackScreen(message: message),
+        builder: (_) => RecordingScreen(recipientIds: [widget.senderId]),
       ),
-    );
+    ).then((_) => _loadMessages());
   }
 
   // ========================================
-  // メッセージ削除
+  // チャットバブル構築
   // ========================================
-  Future<void> _deleteMessage(MessageInfo message) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('削除確認'),
-        content: const Text('このメッセージを削除してもよろしいですか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('キャンセル'),
+  Widget _buildBubble(MessageInfo message) {
+    final isMe = message.isMine;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Row(
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe) ...[
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: Colors.deepPurple,
+              backgroundImage: widget.senderProfileImage != null
+                  ? NetworkImage(widget.senderProfileImage!)
+                  : null,
+              child: widget.senderProfileImage == null
+                  ? Text(
+                      widget.senderUsername[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isMe
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.65,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isMe ? Colors.deepPurple : Colors.grey.shade200,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(isMe ? 16 : 4),
+                      bottomRight: Radius.circular(isMe ? 4 : 16),
+                    ),
+                  ),
+                  padding: message.messageType == 'text'
+                      ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+                      : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: message.messageType == 'text'
+                      ? Text(
+                          message.textContent ?? '',
+                          style: TextStyle(
+                            color: isMe ? Colors.white : Colors.black87,
+                            fontSize: 15,
+                          ),
+                        )
+                      : _buildVoiceBubble(message, isMe),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  timeago.format(message.sentAt, locale: 'ja'),
+                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('削除', style: TextStyle(color: Colors.red)),
-          ),
+          if (isMe) const SizedBox(width: 4),
         ],
       ),
     );
-
-    if (confirm == true) {
-      try {
-        await MessageService.deleteMessage(message.id);
-        _loadMessages();
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('削除エラー: ${e.toString()}')));
-        }
-      }
-    }
   }
 
-  // ========================================
-  // 時間表示をフォーマット
-  // ========================================
-  String _formatTime(DateTime dateTime) {
-    return timeago.format(dateTime, locale: 'ja');
-  }
-
-  // ========================================
-  // リスト表示
-  // ========================================
-  Widget _buildListView() {
-    return ListView.builder(
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final message = _messages[index];
-
-        return Dismissible(
-          key: Key(message.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            color: Colors.red,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            child: const Icon(Icons.delete, color: Colors.white),
-          ),
-          confirmDismiss: (direction) async {
-            return await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('削除確認'),
-                content: const Text('このメッセージを削除してもよろしいですか？'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('キャンセル'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    child: const Text(
-                      '削除',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ],
+  Widget _buildVoiceBubble(MessageInfo message, bool isMe) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          message.isRead ? Icons.volume_up : Icons.volume_off,
+          color: isMe ? Colors.white70 : Colors.deepPurple,
+          size: 22,
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ボイスメッセージ',
+                style: TextStyle(
+                  color: isMe ? Colors.white : Colors.black87,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            );
-          },
-          onDismissed: (direction) async {
-            await MessageService.deleteMessage(message.id);
-            _loadMessages();
-          },
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: message.isRead ? Colors.grey : Colors.deepPurple,
-              child: Icon(
-                message.isRead ? Icons.volume_off : Icons.volume_up,
+              if (message.duration != null)
+                Text(
+                  '${message.duration}秒',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isMe ? Colors.white60 : Colors.grey[600],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => _openPlayback(message),
+          child: Icon(
+            Icons.play_circle_filled,
+            color: isMe ? Colors.white : Colors.deepPurple,
+            size: 36,
+          ),
+        ),
+        if (!message.isRead && !isMe) ...[
+          const SizedBox(width: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              'NEW',
+              style: TextStyle(
                 color: Colors.white,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            title: Row(
-              children: [
-                const Icon(Icons.mic, size: 16),
-                const SizedBox(width: 4),
-                Text(_formatTime(message.sentAt)),
-                if (!message.isRead) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'NEW',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            subtitle: message.duration != null
-                ? Text('長さ: ${message.duration}秒')
-                : null,
-            trailing: IconButton(
-              icon: const Icon(Icons.play_circle_filled),
-              color: Colors.deepPurple,
-              iconSize: 40,
-              onPressed: () => _openPlaybackScreen(message),
-            ),
-            onTap: () => _openPlaybackScreen(message),
           ),
-        );
-      },
-    );
-  }
-
-  // ========================================
-  // カード表示（グリッド）
-  // ========================================
-  Widget _buildGridView() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: _messages.length,
-      itemBuilder: (context, index) {
-        final message = _messages[index];
-
-        return GestureDetector(
-          onTap: () => _openPlaybackScreen(message),
-          onLongPress: () => _deleteMessage(message),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Stack(
-              children: [
-                // ========================================
-                // カード背景
-                // ========================================
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.deepPurple.shade300,
-                        Colors.deepPurple.shade600,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-
-                // ========================================
-                // カード内容
-                // ========================================
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 送信者アイコン
-                      CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.white,
-                        backgroundImage: widget.senderProfileImage != null
-                            ? NetworkImage(widget.senderProfileImage!)
-                            : null,
-                        child: widget.senderProfileImage == null
-                            ? Text(
-                                widget.senderUsername[0].toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.deepPurple,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
-                              )
-                            : null,
-                      ),
-
-                      const Spacer(),
-
-                      // 送信者名
-                      Text(
-                        widget.senderUsername,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // 日時
-                      Text(
-                        _formatTime(message.sentAt),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-
-                      if (message.duration != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.mic,
-                              size: 12,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${message.duration}秒',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // ========================================
-                // 未読バッジ
-                // ========================================
-                if (!message.isRead)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          'N',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                // ========================================
-                // 再生アイコン（中央）
-                // ========================================
-                Center(
-                  child: Icon(
-                    Icons.play_circle_filled,
-                    color: Colors.white.withOpacity(0.8),
-                    size: 48,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+        ],
+      ],
     );
   }
 
@@ -433,21 +309,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
           ],
         ),
         actions: [
-          // ========================================
-          // 表示切り替えボタン
-          // ========================================
-          IconButton(
-            icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-            tooltip: _isGridView ? 'リスト表示' : 'カード表示',
-            onPressed: () {
-              setState(() {
-                _isGridView = !_isGridView;
-              });
-            },
-          ),
-          // ========================================
-          // 再読み込みボタン
-          // ========================================
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '再読み込み',
@@ -471,12 +332,96 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 ],
               ),
             )
-          : _messages.isEmpty
-          ? const Center(child: Text('メッセージがありません'))
-          : RefreshIndicator(
-              onRefresh: _loadMessages,
-              child: _isGridView ? _buildGridView() : _buildListView(),
+          : Column(
+              children: [
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _loadMessages,
+                    child: _messages.isEmpty
+                        ? const Center(child: Text('まだメッセージはありません'))
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            itemCount: _messages.length,
+                            itemBuilder: (_, i) => _buildBubble(_messages[i]),
+                          ),
+                  ),
+                ),
+                _buildInputArea(),
+              ],
             ),
+    );
+  }
+
+  // ========================================
+  // 入力エリア
+  // ========================================
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.mic, color: Colors.deepPurple),
+              tooltip: 'ボイスメッセージ',
+              onPressed: _openRecording,
+            ),
+            Expanded(
+              child: TextField(
+                controller: _textController,
+                minLines: 1,
+                maxLines: 4,
+                textInputAction: TextInputAction.newline,
+                decoration: InputDecoration(
+                  hintText: 'メッセージを入力',
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: const BorderSide(
+                      color: Colors.deepPurple,
+                      width: 1.5,
+                    ),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            _isSending
+                ? const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.send, color: Colors.deepPurple),
+                    onPressed: _sendText,
+                    tooltip: '送信',
+                  ),
+          ],
+        ),
+      ),
     );
   }
 }

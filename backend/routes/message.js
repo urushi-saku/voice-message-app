@@ -11,6 +11,7 @@ const path = require('path');
 const { protect } = require('../middleware/auth');
 const {
   sendMessage,
+  sendTextMessage,
   getReceivedMessages,
   getSentMessages,
   markAsRead,
@@ -67,6 +68,10 @@ const upload = multer({
 // メッセージ送信（ファイルアップロード付き）
 // POST /messages/send
 router.post('/send', protect, upload.single('voice'), sendMessage);
+
+// テキストメッセージ送信
+// POST /messages/send-text
+router.post('/send-text', protect, sendTextMessage);
 
 // 受信メッセージリスト取得
 // GET /messages/received

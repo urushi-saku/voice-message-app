@@ -23,22 +23,35 @@ const messageSchema = new mongoose.Schema(
       },
     ],
 
-    // 音声ファイルパス
+    // メッセージ種別: 'voice' | 'text'
+    messageType: {
+      type: String,
+      enum: ['voice', 'text'],
+      default: 'voice',
+    },
+
+    // テキストメッセージ内容（messageType === 'text' の場合）
+    textContent: {
+      type: String,
+      default: null,
+    },
+
+    // 音声ファイルパス（messageType === 'voice' の場合）
     filePath: {
       type: String,
-      required: true,
+      default: null,
     },
 
     // オリジナルファイル名
     originalFilename: {
       type: String,
-      required: true,
+      default: null,
     },
 
     // ファイルサイズ（バイト）
     fileSize: {
       type: Number,
-      required: true,
+      default: 0,
     },
 
     // 音声の長さ（秒）

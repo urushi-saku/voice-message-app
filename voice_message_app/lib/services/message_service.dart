@@ -21,6 +21,9 @@ class MessageInfo {
   final String senderId;
   final String senderUsername;
   final String? senderProfileImage;
+  final String messageType; // 'voice' | 'text'
+  final String? textContent;
+  final bool isMine;
   final String filePath;
   final int fileSize;
   final int? duration;
@@ -34,6 +37,9 @@ class MessageInfo {
     required this.senderId,
     required this.senderUsername,
     this.senderProfileImage,
+    this.messageType = 'voice',
+    this.textContent,
+    this.isMine = false,
     required this.filePath,
     required this.fileSize,
     this.duration,
@@ -50,8 +56,11 @@ class MessageInfo {
       senderId: json['sender']['_id'] ?? json['sender'],
       senderUsername: json['sender']['username'] ?? 'Unknown',
       senderProfileImage: json['sender']['profileImage'],
-      filePath: json['filePath'],
-      fileSize: json['fileSize'],
+      messageType: json['messageType'] ?? 'voice',
+      textContent: json['textContent'],
+      isMine: json['isMine'] ?? false,
+      filePath: json['filePath'] ?? '',
+      fileSize: json['fileSize'] ?? 0,
       duration: json['duration'],
       mimeType: json['mimeType'] ?? 'audio/mpeg',
       sentAt: DateTime.parse(json['sentAt']),
@@ -92,6 +101,9 @@ class ThreadInfo {
         senderId: json['sender']['_id'],
         senderUsername: json['sender']['username'],
         senderProfileImage: json['sender']['profileImage'],
+        messageType: json['lastMessage']['messageType'] ?? 'voice',
+        textContent: json['lastMessage']['textContent'],
+        isMine: json['lastMessage']['isMine'] ?? false,
         filePath: '',
         fileSize: 0,
         duration: json['lastMessage']['duration'],
@@ -134,7 +146,6 @@ class MessageService {
     }
 
     final networkService = NetworkConnectivityService();
-    final offlineService = OfflineService();
 
     // ========================================
     // オフラインモード判定
@@ -232,7 +243,9 @@ class MessageService {
     final fileSize = fileStat.size;
 
     // 現在のユーザーIDを取得
-    final currentUserId = await AuthService.getMe().then((user) => user['_id'] ?? user['id']);
+    final currentUserId = await AuthService.getMe().then(
+      (user) => user['_id'] ?? user['id'],
+    );
 
     // オフラインメッセージオブジェクトを作成
     final offlineMessage = OfflineMessage(
@@ -257,6 +270,32 @@ class MessageService {
     print('📊 ネットワーク復帰時に自動的に送信されます');
 
     return messageId;
+  }
+
+  /// ========================================
+  /// テキストメッセージ送信
+  /// POST /messages/send-text
+  /// ========================================
+  static Future<void> sendTextMessage({
+    required List<String> receiverIds,
+    required String textContent,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final response = await http.post(
+      Uri.parse('$BASE_URL/messages/send-text'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'receivers': receiverIds, 'textContent': textContent}),
+    );
+
+    if (response.statusCode != 201) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'テキストメッセージの送信に失敗しました');
+    }
   }
 
   /// ========================================

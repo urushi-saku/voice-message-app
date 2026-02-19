@@ -241,14 +241,16 @@ class AuthProvider extends ChangeNotifier {
   Future<void> loadUserInfo() async {
     try {
       final userInfo = await AuthService.getMe();
+      // getMe() は { "user": { ... } } を返す
+      final u = userInfo['user'] as Map<String, dynamic>? ?? userInfo;
       _user = User(
-        id: userInfo['_id'] ?? _user?.id ?? '',
-        username: userInfo['username'] ?? _user?.username ?? '',
-        email: userInfo['email'] ?? _user?.email ?? '',
-        profileImage: userInfo['profileImage'] ?? _user?.profileImage,
-        bio: userInfo['bio'] ?? _user?.bio ?? '',
-        followersCount: userInfo['followersCount'] ?? _user?.followersCount ?? 0,
-        followingCount: userInfo['followingCount'] ?? _user?.followingCount ?? 0,
+        id: u['id']?.toString() ?? u['_id']?.toString() ?? _user?.id ?? '',
+        username: u['username'] ?? _user?.username ?? '',
+        email: u['email'] ?? _user?.email ?? '',
+        profileImage: u['profileImage'] ?? _user?.profileImage,
+        bio: u['bio'] ?? _user?.bio ?? '',
+        followersCount: u['followersCount'] ?? _user?.followersCount ?? 0,
+        followingCount: u['followingCount'] ?? _user?.followingCount ?? 0,
       );
       notifyListeners();
     } catch (e) {

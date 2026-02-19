@@ -85,7 +85,6 @@ void main() async {
     print('📡 Current status: ${networkService.getStatusText()}');
 
     // 同期サービスを初期化
-    final syncService = SyncService();
     // NOTE: SyncServiceの完全な初期化はMessageServiceが必要なため、
     //       main.dartではなく、認証後にAuthProviderで実行
     print('✅ Sync Service initialized');

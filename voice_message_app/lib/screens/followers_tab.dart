@@ -9,10 +9,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
+import 'user_profile_screen.dart';
 
 /// フォロワー一覧を表示するウィジェット
 class FollowersTab extends StatefulWidget {
-  const FollowersTab({super.key});
+  // 0: フォロワー, 1: フォロー中
+  final int initialTabIndex;
+
+  const FollowersTab({super.key, this.initialTabIndex = 0});
 
   @override
   State<FollowersTab> createState() => _FollowersTabState();
@@ -83,6 +87,7 @@ class _FollowersTabState extends State<FollowersTab> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTabIndex,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('フォロワー'),
@@ -145,6 +150,10 @@ class _FollowersTabState extends State<FollowersTab> {
           final user = users[index];
 
           return ListTile(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)),
+            ),
             // ========================================
             // ユーザーアイコン
             // ========================================
@@ -184,23 +193,6 @@ class _FollowersTabState extends State<FollowersTab> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-              ],
-            ),
-
-            // ========================================
-            // フォロワー数・フォロー中数
-            // ========================================
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${user.followersCount} フォロワー',
-                  style: const TextStyle(fontSize: 11),
-                ),
-                Text(
-                  '${user.followingCount} フォロー中',
-                  style: const TextStyle(fontSize: 11),
-                ),
               ],
             ),
           );
@@ -353,6 +345,12 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                       final isFollowing = false;
 
                       return ListTile(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UserProfileScreen(user: user),
+                          ),
+                        ),
                         leading: CircleAvatar(
                           backgroundColor: Colors.deepPurple,
                           backgroundImage: user.profileImage != null

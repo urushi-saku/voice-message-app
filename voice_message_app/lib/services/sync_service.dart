@@ -27,6 +27,7 @@ class SyncService extends ChangeNotifier {
   // ============================================================================
 
   final OfflineService _offlineService = OfflineService();
+  // ignore: unused_field
   late MessageService _messageService;
   late NetworkConnectivityService _networkService;
 
