@@ -22,6 +22,7 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
+  final _handleController = TextEditingController();
   final _bioController = TextEditingController();
 
   File? _selectedImage;
@@ -35,6 +36,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (authProvider.user != null) {
       _usernameController.text = authProvider.user!.username;
+      _handleController.text = authProvider.user!.handle;
       _bioController.text = authProvider.user!.bio;
     }
   }
@@ -42,6 +44,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _usernameController.dispose();
+    _handleController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -94,13 +97,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await UserService.updateProfileImage(_selectedImage!);
       }
 
-      // ユーザー名または自己紹介が変更されている場合は更新
+      // ユーザー名またはhandleまたは自己紹介が変更されている場合は更新
       final usernameChanged = _usernameController.text != currentUser.username;
+      final handleChanged = _handleController.text.toLowerCase().trim() != currentUser.handle;
       final bioChanged = _bioController.text != currentUser.bio;
 
-      if (usernameChanged || bioChanged) {
+      if (usernameChanged || handleChanged || bioChanged) {
         await UserService.updateProfile(
           username: usernameChanged ? _usernameController.text : null,
+          handle: handleChanged ? _handleController.text.toLowerCase().trim() : null,
           bio: bioChanged ? _bioController.text : null,
         );
       }
@@ -238,7 +243,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(
-                    labelText: 'ユーザー名',
+                    labelText: 'ユーザー名（表示名）',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
@@ -246,11 +251,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'ユーザー名を入力してください';
                     }
-                    if (value.trim().length < 3) {
-                      return 'ユーザー名は3文字以上必要です';
-                    }
                     if (value.trim().length > 30) {
                       return 'ユーザー名は30文字以内で設定してください';
+                    }
+                    return null;
+                  },
+                  enabled: !_isLoading,
+                ),
+
+                const SizedBox(height: 16),
+
+                // ========================================
+                // ID入力
+                // ========================================
+                TextFormField(
+                  controller: _handleController,
+                  autocorrect: false,
+                  decoration: InputDecoration(
+                    labelText: 'ID（@handle）',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.alternate_email),
+                    prefixText: '@',
+                    helperText: '英小文字・数字・_の3〜20文字',
+                    helperStyle: TextStyle(color: Colors.grey[600]),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'IDを入力してください';
+                    }
+                    final regex = RegExp(r'^[a-z0-9_]{3,20}$');
+                    if (!regex.hasMatch(value.toLowerCase().trim())) {
+                      return 'IDは英小文字・数字・_の3〜20文字で入力してください';
                     }
                     return null;
                   },

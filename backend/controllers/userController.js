@@ -22,14 +22,16 @@ exports.searchUsers = async (req, res) => {
       return res.status(400).json({ error: '検索キーワードを入力してください' });
     }
 
-    // ユーザー名で部分一致検索（自分以外）
-    // 正規表現で大文字小文字を区別せずに検索
+    // handleまたはusernameで部分一致検索（自分以外）
     const users = await User.find({
-      _id: { $ne: currentUserId }, // 自分を除外
-      username: { $regex: q, $options: 'i' } // 大文字小文字を区別しない
+      _id: { $ne: currentUserId },
+      $or: [
+        { handle:   { $regex: q, $options: 'i' } },
+        { username: { $regex: q, $options: 'i' } },
+      ]
     })
-      .select('username email profileImage bio followersCount followingCount')
-      .limit(20); // 最大20件まで
+      .select('username handle email profileImage bio followersCount followingCount')
+      .limit(20);
 
     res.json(users);
   } catch (error) {
@@ -149,7 +151,7 @@ exports.getFollowers = async (req, res) => {
     // Followerテーブルから、userがuserIdのレコードを検索し、
     // followerフィールドをpopulateして詳細情報を取得
     const followers = await Follower.find({ user: userId })
-      .populate('follower', 'username email profileImage bio')
+      .populate('follower', 'username handle email profileImage bio followersCount followingCount')
       .sort({ followedAt: -1 }); // 新しい順
 
     // followerフィールドの情報のみを抽出
@@ -181,7 +183,7 @@ exports.getFollowing = async (req, res) => {
     // Followerテーブルから、followerがuserIdのレコードを検索し、
     // userフィールドをpopulateして詳細情報を取得
     const following = await Follower.find({ follower: userId })
-      .populate('user', 'username email profileImage bio')
+      .populate('user', 'username handle email profileImage bio followersCount followingCount')
       .sort({ followedAt: -1 }); // 新しい順
 
     // userフィールドの情報のみを抽出
@@ -204,7 +206,7 @@ exports.getUserById = async (req, res) => {
     const userId = req.params.id;
 
     const user = await User.findById(userId)
-      .select('username email profileImage bio followersCount followingCount createdAt');
+      .select('username handle email profileImage bio followersCount followingCount createdAt');
 
     if (!user) {
       return res.status(404).json({ error: 'ユーザーが見つかりません' });
@@ -225,30 +227,36 @@ exports.getUserById = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const currentUserId = req.user.id;
-    const { username, bio } = req.body;
+    const { username, handle, bio } = req.body;
 
     // 更新するフィールドを構築
     const updateFields = {};
     
     if (username !== undefined) {
       // ユーザー名のバリデーション
-      if (username.trim().length < 3) {
-        return res.status(400).json({ error: 'ユーザー名は3文字以上必要です' });
+      if (username.trim().length < 1) {
+        return res.status(400).json({ error: 'ユーザー名を入力してください' });
       }
       if (username.trim().length > 30) {
         return res.status(400).json({ error: 'ユーザー名は30文字以内で設定してください' });
       }
+      updateFields.username = username.trim();
+    }
 
-      // ユーザー名の重複チェック（自分以外）
-      const existingUser = await User.findOne({
-        username: username.trim(),
+    if (handle !== undefined) {
+      const handleLower = handle.toLowerCase().trim();
+      if (!/^[a-z0-9_]{3,20}$/.test(handleLower)) {
+        return res.status(400).json({ error: 'IDは英小文字・数字・_の3〜20文字で入力してください' });
+      }
+      // handleの重複チェック（自分以外）
+      const existingHandle = await User.findOne({
+        handle: handleLower,
         _id: { $ne: currentUserId }
       });
-      if (existingUser) {
-        return res.status(400).json({ error: 'このユーザー名は既に使用されています' });
+      if (existingHandle) {
+        return res.status(400).json({ error: 'このIDは既に使用されています' });
       }
-
-      updateFields.username = username.trim();
+      updateFields.handle = handleLower;
     }
 
     if (bio !== undefined) {
@@ -269,7 +277,7 @@ exports.updateProfile = async (req, res) => {
       currentUserId,
       { $set: updateFields },
       { new: true, runValidators: true }
-    ).select('username email profileImage bio followersCount followingCount');
+    ).select('username handle email profileImage bio followersCount followingCount');
 
     res.json({
       message: 'プロフィールを更新しました',

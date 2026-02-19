@@ -21,15 +21,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ========================================
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
+  final _handleController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
-  bool _obscurePassword = true; // パスワード非表示フラグ
-  bool _obscurePasswordConfirm = true; // 確認パスワード非表示フラグ
+  bool _obscurePassword = true;
+  bool _obscurePasswordConfirm = true;
 
   @override
   void dispose() {
     _usernameController.dispose();
+    _handleController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
@@ -39,6 +41,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ========================================
   // バリデーション関数
   // ========================================
+  String? _validateHandle(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'IDを入力してください';
+    }
+    final lower = value.toLowerCase();
+    final regex = RegExp(r'^[a-z0-9_]{3,20}$');
+    if (!regex.hasMatch(lower)) {
+      return 'IDは英小文字・数字・_の3〜20文字で入力してください';
+    }
+    return null;
+  }
+
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) {
       return 'ユーザー名を入力してください';
@@ -102,6 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final success = await authProvider.register(
         username: _usernameController.text,
+        handle: _handleController.text.toLowerCase().trim(),
         email: _emailController.text,
         password: _passwordController.text,
       );
@@ -172,9 +187,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _usernameController,
                         validator: _validateUsername,
                         decoration: InputDecoration(
-                          labelText: 'ユーザー名',
-                          hintText: 'taro_yamada',
+                          labelText: 'ユーザー名（表示名）',
+                          hintText: 'たろう',
                           prefixIcon: const Icon(Icons.person_outline),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ID入力フィールド
+                      TextFormField(
+                        controller: _handleController,
+                        validator: _validateHandle,
+                        autocorrect: false,
+                        decoration: InputDecoration(
+                          labelText: 'ID（@handle）',
+                          hintText: 'taro_123',
+                          prefixText: '@',
+                          helperText: '英小文字・数字・_の3〜20文字。後から変更可能',
+                          prefixIcon: const Icon(Icons.alternate_email),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),

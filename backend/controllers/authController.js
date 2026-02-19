@@ -13,31 +13,31 @@ const User = require('../models/User');
  */
 exports.register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, handle, email, password } = req.body;
 
     // 入力チェック
-    if (!username || !email || !password) {
+    if (!username || !handle || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'ユーザー名、メールアドレス、パスワードは必須です',
+        message: 'ユーザー名、ID、メールアドレス、パスワードは必須です',
       });
     }
 
-    // ユーザー名の重複チェック
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
+    // handleのフォーマットチェック
+    const handleLower = handle.toLowerCase().trim();
+    if (!/^[a-z0-9_]{3,20}$/.test(handleLower)) {
       return res.status(400).json({
         success: false,
-        message: 'このユーザー名は既に使用されています',
+        message: 'IDは英小文字・数字・_の3〜20文字で入力してください',
       });
     }
 
-    // メールアドレスの重複チェック
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
+    // handleの重複チェック
+    const existingHandle = await User.findOne({ handle: handleLower });
+    if (existingHandle) {
       return res.status(400).json({
         success: false,
-        message: 'このメールアドレスは既に登録されています',
+        message: 'このIDは既に使用されています',
       });
     }
 
@@ -48,6 +48,7 @@ exports.register = async (req, res) => {
     // 新しいユーザーを作成
     const user = await User.create({
       username,
+      handle: handleLower,
       email,
       password: hashedPassword,
     });
@@ -64,6 +65,7 @@ exports.register = async (req, res) => {
         user: {
           id: user._id,
           username: user.username,
+          handle: user.handle,
           email: user.email,
           profileImage: user.profileImage,
           bio: user.bio,
@@ -126,8 +128,7 @@ exports.login = async (req, res) => {
       data: {
         user: {
           id: user._id,
-          username: user.username,
-          email: user.email,
+          username: user.username,          handle: user.handle,          email: user.email,
           profileImage: user.profileImage,
           bio: user.bio,
           followersCount: user.followersCount,
@@ -161,6 +162,7 @@ exports.getMe = async (req, res) => {
         user: {
           id: user._id,
           username: user.username,
+          handle: user.handle,
           email: user.email,
           profileImage: user.profileImage,
           bio: user.bio,

@@ -1,17 +1,16 @@
 // ========================================
-// フォロワー選択画面
+// トーク相手選択画面
 // ========================================
-// 初学者向け説明：
-// このファイルは、ボイスメッセージを送る相手を選択する画面です
-// 複数のフォロワーを選択して、まとめて送信できます
+// フォロー中のユーザーを一覧表示し、
+// タップするとそのユーザーとのトーク画面を開きます
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
-import 'recording_screen.dart';
+import 'thread_detail_screen.dart';
 
-/// フォロワー選択画面
+/// トーク相手選択画面
 class SelectFollowerScreen extends StatefulWidget {
   const SelectFollowerScreen({super.key});
 
@@ -20,11 +19,7 @@ class SelectFollowerScreen extends StatefulWidget {
 }
 
 class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
-  // ========================================
-  // 状態変数
-  // ========================================
   List<UserInfo> _following = [];
-  final Set<String> _selectedUserIds = {};
   bool _isLoading = true;
   String? _error;
 
@@ -34,9 +29,6 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
     _loadFollowing();
   }
 
-  // ========================================
-  // フォロー中リストを読み込み
-  // ========================================
   Future<void> _loadFollowing() async {
     setState(() {
       _isLoading = true;
@@ -47,9 +39,7 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
       final authProvider = context.read<AuthProvider>();
       final userId = authProvider.user?.id;
 
-      if (userId == null) {
-        throw Exception('ユーザー情報が取得できません');
-      }
+      if (userId == null) throw Exception('ユーザー情報が取得できません');
 
       final following = await UserService.getFollowing(userId);
 
@@ -65,50 +55,16 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
     }
   }
 
-  // ========================================
-  // 選択/解除を切り替え
-  // ========================================
-  void _toggleSelection(String userId) {
-    setState(() {
-      if (_selectedUserIds.contains(userId)) {
-        _selectedUserIds.remove(userId);
-      } else {
-        _selectedUserIds.add(userId);
-      }
-    });
-  }
-
-  // ========================================
-  // 全選択/全解除
-  // ========================================
-  void _toggleAllSelection() {
-    setState(() {
-      if (_selectedUserIds.length == _following.length) {
-        _selectedUserIds.clear();
-      } else {
-        _selectedUserIds.clear();
-        _selectedUserIds.addAll(_following.map((u) => u.id));
-      }
-    });
-  }
-
-  // ========================================
-  // 選択完了
-  // ========================================
-  void _confirmSelection() {
-    if (_selectedUserIds.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('送信先を選択してください')));
-      return;
-    }
-
-    // 録音画面に遷移
+  // ユーザーをタップしてトーク画面へ遷移
+  void _openChat(UserInfo user) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            RecordingScreen(recipientIds: _selectedUserIds.toList()),
+        builder: (_) => ThreadDetailScreen(
+          senderId: user.id,
+          senderUsername: user.username,
+          senderProfileImage: user.profileImage,
+        ),
       ),
     );
   }
@@ -117,27 +73,7 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          _selectedUserIds.isNotEmpty
-              ? '送信先を選択 (${_selectedUserIds.length}人)'
-              : '送信先を選択',
-        ),
-        actions: [
-          // ========================================
-          // 全選択/全解除ボタン
-          // ========================================
-          IconButton(
-            icon: Icon(
-              _selectedUserIds.length == _following.length
-                  ? Icons.check_box
-                  : Icons.check_box_outline_blank,
-            ),
-            tooltip: _selectedUserIds.length == _following.length
-                ? '全解除'
-                : '全選択',
-            onPressed: _toggleAllSelection,
-          ),
-        ],
+        title: const Text('トーク相手を選択'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -156,79 +92,59 @@ class _SelectFollowerScreenState extends State<SelectFollowerScreen> {
               ),
             )
           : _following.isEmpty
-          ? const Center(child: Text('フォロー中のユーザーがいません'))
-          : Column(
-              children: [
-                // ========================================
-                // 選択したユーザー数の表示
-                // ========================================
-                if (_selectedUserIds.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    color: Colors.deepPurple.withOpacity(0.1),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.info_outline,
-                          color: Colors.deepPurple,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${_selectedUserIds.length}人を選択中',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    'フォロー中のユーザーがいません',
+                    style: TextStyle(color: Colors.grey),
                   ),
-
-                // ========================================
-                // フォロワーリスト
-                // ========================================
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _following.length,
-                    itemBuilder: (context, index) {
-                      final user = _following[index];
-                      final isSelected = _selectedUserIds.contains(user.id);
-
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: (_) => _toggleSelection(user.id),
-                        secondary: CircleAvatar(
-                          backgroundColor: Colors.deepPurple,
-                          backgroundImage: user.profileImage != null
-                              ? NetworkImage(user.profileImage!)
-                              : null,
-                          child: user.profileImage == null
-                              ? Text(
-                                  user.username[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        title: Text(user.username),
-                        subtitle: Text(user.email),
-                        activeColor: Colors.deepPurple,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-      // ========================================
-      // 次へボタン（フローティングアクションボタン）
-      // ========================================
-      floatingActionButton: _selectedUserIds.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: _confirmSelection,
-              icon: const Icon(Icons.mic),
-              label: const Text('録音する'),
-              backgroundColor: Colors.deepPurple,
+                ],
+              ),
             )
-          : null,
+          : RefreshIndicator(
+              onRefresh: _loadFollowing,
+              child: ListView.builder(
+                itemCount: _following.length,
+                itemBuilder: (context, index) {
+                  final user = _following[index];
+
+                  return ListTile(
+                    onTap: () => _openChat(user),
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.deepPurple,
+                      backgroundImage: user.profileImage != null
+                          ? NetworkImage(user.profileImage!)
+                          : null,
+                      child: user.profileImage == null
+                          ? Text(
+                              user.username[0].toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
+                    ),
+                    title: Text(
+                      user.username,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(
+                      '@${user.handle}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right,
+                      color: Colors.grey,
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

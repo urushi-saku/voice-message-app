@@ -7,15 +7,26 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
   {
-    // ユーザー名（ユニーク、必須）
+    // 表示名（重複可）
     username: {
       type: String,
       required: [true, 'ユーザー名は必須です'],
+      trim: true,
+      minlength: [1, 'ユーザー名は1文字以上必要です'],
+      maxlength: [30, 'ユーザー名は30文字以内で設定してください'],
+    },
+
+    // ユニークID（@handle）
+    handle: {
+      type: String,
+      required: [true, 'IDは必須です'],
       unique: true,
       trim: true,
+      lowercase: true,
       index: true,
-      minlength: [3, 'ユーザー名は3文字以上必要です'],
-      maxlength: [30, 'ユーザー名は30文字以内で設定してください'],
+      minlength: [3, 'IDは3文字以上必要です'],
+      maxlength: [20, 'IDは20文字以内で設定してください'],
+      match: [/^[a-z0-9_]+$/, 'IDは英小文字・数字・_のみ使用できます'],
     },
 
     // メールアドレス（ユニーク、必須）

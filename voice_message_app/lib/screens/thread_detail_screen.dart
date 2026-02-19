@@ -308,13 +308,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '再読み込み',
-            onPressed: _loadMessages,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

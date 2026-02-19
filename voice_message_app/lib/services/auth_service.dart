@@ -60,6 +60,7 @@ class AuthService {
   ///   Response: { success, message, data: { user, token } }
   static Future<Map<String, dynamic>> register({
     required String username,
+    required String handle,
     required String email,
     required String password,
   }) async {
@@ -70,6 +71,7 @@ class AuthService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'username': username,
+          'handle': handle,
           'email': email,
           'password': password,
         }),

@@ -13,6 +13,7 @@ import 'auth_service.dart';
 class UserInfo {
   final String id;
   final String username;
+  final String handle;
   final String email;
   final String? profileImage;
   final String bio;
@@ -22,6 +23,7 @@ class UserInfo {
   UserInfo({
     required this.id,
     required this.username,
+    required this.handle,
     required this.email,
     this.profileImage,
     required this.bio,
@@ -32,9 +34,10 @@ class UserInfo {
   /// JSONからUserInfoオブジェクトを生成
   factory UserInfo.fromJson(Map<String, dynamic> json) {
     return UserInfo(
-      id: json['_id'],
-      username: json['username'],
-      email: json['email'],
+      id: json['_id'] ?? json['id'] ?? '',
+      username: json['username'] ?? '',
+      handle: json['handle'] ?? json['username'] ?? '',
+      email: json['email'] ?? '',
       profileImage: json['profileImage'],
       bio: json['bio'] ?? '',
       followersCount: json['followersCount'] ?? 0,
@@ -225,7 +228,7 @@ class UserService {
   /// ②PUT リクエスト送信（JSONボディ付き）
   /// ③更新されたユーザー情報を返す
   /// ④エラー時は例外をスロー
-  static Future<UserInfo> updateProfile({String? username, String? bio}) async {
+  static Future<UserInfo> updateProfile({String? username, String? handle, String? bio}) async {
     final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('認証が必要です');
@@ -233,6 +236,7 @@ class UserService {
 
     final Map<String, dynamic> body = {};
     if (username != null) body['username'] = username;
+    if (handle != null) body['handle'] = handle;
     if (bio != null) body['bio'] = bio;
 
     if (body.isEmpty) {

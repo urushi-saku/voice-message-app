@@ -174,15 +174,15 @@ class _FollowersTabState extends State<FollowersTab> {
             ),
 
             // ========================================
-            // ユーザー名・メールアドレス
+            // ユーザー名・ID・自己紹介
             // ========================================
             title: Text(user.username),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user.email,
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  '@${user.handle}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
                 ),
                 if (user.bio.isNotEmpty) ...[
                   const SizedBox(height: 4),
@@ -367,7 +367,10 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                               : null,
                         ),
                         title: Text(user.username),
-                        subtitle: Text(user.email),
+                        subtitle: Text(
+                          '@${user.handle}',
+                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                        ),
                         trailing: ElevatedButton(
                           onPressed: () => _toggleFollow(user, isFollowing),
                           style: ElevatedButton.styleFrom(

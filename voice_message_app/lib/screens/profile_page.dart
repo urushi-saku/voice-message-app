@@ -97,11 +97,11 @@ class ProfilePage extends StatelessWidget {
                   const SizedBox(height: 8),
 
                   // ========================================
-                  // メールアドレス
+                  // ユーザーID
                   // ========================================
                   Text(
-                    user.email,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    '@${user.handle}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
 
                   const SizedBox(height: 24),

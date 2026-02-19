@@ -128,11 +128,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               const SizedBox(height: 8),
 
               // ========================================
-              // メールアドレス
+              // ユーザーID
               // ========================================
               Text(
-                widget.user.email,
-                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                '@${widget.user.handle}',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
               ),
 
               const SizedBox(height: 24),

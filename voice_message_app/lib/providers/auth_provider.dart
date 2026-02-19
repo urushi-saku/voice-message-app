@@ -34,6 +34,7 @@ import '../services/auth_service.dart';
 class User {
   final String id;
   final String username;
+  final String handle;
   final String email;
   final String? profileImage;
   final String bio;
@@ -43,6 +44,7 @@ class User {
   User({
     required this.id,
     required this.username,
+    required this.handle,
     required this.email,
     this.profileImage,
     this.bio = '',
@@ -50,24 +52,17 @@ class User {
     this.followingCount = 0,
   });
 
-  // JSONからUserオブジェクトに変換
-  /// 【用途】
-  /// - バックエンドのレスポンス（JSON）を Dart オブジェクトに変換
-  /// 【処理】
-  /// 1. レスポンスの data.user オブジェクトまたはルートレベルから値を取得
-  /// 2. null チェック（?? で初期値を指定）
-  /// 3. User インスタンスを生成して返す
   factory User.fromJson(Map<String, dynamic> json) {
+    final u = json['user'] as Map<String, dynamic>? ?? json;
     return User(
-      id: json['user']['id'] ?? json['id'] ?? '',
-      username: json['user']['username'] ?? json['username'] ?? '',
-      email: json['user']['email'] ?? json['email'] ?? '',
-      profileImage: json['user']['profileImage'] ?? json['profileImage'],
-      bio: json['user']['bio'] ?? json['bio'] ?? '',
-      followersCount:
-          json['user']['followersCount'] ?? json['followersCount'] ?? 0,
-      followingCount:
-          json['user']['followingCount'] ?? json['followingCount'] ?? 0,
+      id: u['id']?.toString() ?? u['_id']?.toString() ?? '',
+      username: u['username'] ?? '',
+      handle: u['handle'] ?? u['username'] ?? '',
+      email: u['email'] ?? '',
+      profileImage: u['profileImage'],
+      bio: u['bio'] ?? '',
+      followersCount: u['followersCount'] ?? 0,
+      followingCount: u['followingCount'] ?? 0,
     );
   }
 }
@@ -180,6 +175,7 @@ class AuthProvider extends ChangeNotifier {
   /// 新規ユーザーで登録する
   Future<bool> register({
     required String username,
+    required String handle,
     required String email,
     required String password,
   }) async {
@@ -190,6 +186,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final result = await AuthService.register(
         username: username,
+        handle: handle,
         email: email,
         password: password,
       );
@@ -246,6 +243,7 @@ class AuthProvider extends ChangeNotifier {
       _user = User(
         id: u['id']?.toString() ?? u['_id']?.toString() ?? _user?.id ?? '',
         username: u['username'] ?? _user?.username ?? '',
+        handle: u['handle'] ?? u['username'] ?? _user?.handle ?? '',
         email: u['email'] ?? _user?.email ?? '',
         profileImage: u['profileImage'] ?? _user?.profileImage,
         bio: u['bio'] ?? _user?.bio ?? '',
