@@ -5,6 +5,8 @@ node_modules/
 # Firebase
 backend/config/serviceAccountKey.json
 backend/config/serviceAccountKey.*.json
+voice_message_app/android/app/google-services.json
+voice_message_app/lib/firebase_options.dart
 
 # Flutter
 build/
