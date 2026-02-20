@@ -55,6 +55,14 @@ class _HomePageState extends State<HomePage> {
             _currentTabIndex = index;
           });
         },
+        // アクティブタブの表示を改善
+        selectedItemColor: Theme.of(context).primaryColor,
+        unselectedItemColor: Colors.grey,
+        selectedFontSize: 13,
+        unselectedFontSize: 12,
+        showSelectedLabels: true,
+        showUnselectedLabels: true,
+        elevation: 8,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'メッセージ'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'プロフィール'),

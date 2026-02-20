@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../services/message_service.dart';
 import 'select_follower_screen.dart';
 import 'thread_detail_screen.dart';
+import 'followers_tab.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 /// メッセージスレッド一覧画面
@@ -82,12 +83,30 @@ class _MessageThreadsScreenState extends State<MessageThreadsScreen> {
     });
   }
 
+  // ========================================
+  // ユーザー検索画面を開く
+  // ========================================
+  void _openUserSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const UserSearchScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('メッセージ'),
         actions: [
+          // ========================================
+          // ユーザー検索ボタン
+          // ========================================
+          IconButton(
+            icon: const Icon(Icons.person_add),
+            tooltip: 'ユーザー検索',
+            onPressed: _openUserSearch,
+          ),
           // ========================================
           // 再読み込みボタン
           // ========================================

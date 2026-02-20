@@ -215,13 +215,40 @@ class UserSearchScreen extends StatefulWidget {
 class _UserSearchScreenState extends State<UserSearchScreen> {
   final _searchController = TextEditingController();
   List<UserInfo> _searchResults = [];
+  List<UserInfo> _following = []; // フォロー中のユーザーリスト（フォロー状態判定用）
   bool _isSearching = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFollowingList();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // ========================================
+  // フォロー中のリストを読み込み
+  // ========================================
+  Future<void> _loadFollowingList() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.user?.id;
+      if (userId != null) {
+        final following = await UserService.getFollowing(userId);
+        if (mounted) {
+          setState(() {
+            _following = following;
+          });
+        }
+      }
+    } catch (e) {
+      print('フォロー中リスト読み込みエラー: $e');
+    }
   }
 
   // ========================================
@@ -262,6 +289,9 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
       if (isFollowing) {
         await UserService.unfollowUser(user.id);
         if (mounted) {
+          setState(() {
+            _following.removeWhere((u) => u.id == user.id);
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${user.username}のフォローを解除しました')),
           );
@@ -269,13 +299,14 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
       } else {
         await UserService.followUser(user.id);
         if (mounted) {
+          setState(() {
+            _following.add(user);
+          });
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('${user.username}をフォローしました')));
         }
       }
-      // 再検索して状態を更新
-      _searchUsers(_searchController.text);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -317,9 +348,10 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                     : null,
               ),
               onChanged: (value) {
+                setState(() {}); // UI更新トリガー（クリアボタン表示用）
                 // デバウンス処理（0.5秒待ってから検索）
                 Future.delayed(const Duration(milliseconds: 500), () {
-                  if (_searchController.text == value) {
+                  if (mounted && _searchController.text == value) {
                     _searchUsers(value);
                   }
                 });
@@ -341,8 +373,8 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                     itemCount: _searchResults.length,
                     itemBuilder: (context, index) {
                       final user = _searchResults[index];
-                      // TODO: フォロー状態を確認する実装が必要
-                      final isFollowing = false;
+                      // フォロー状態を判定
+                      final isFollowing = _following.any((u) => u.id == user.id);
 
                       return ListTile(
                         onTap: () => Navigator.push(
@@ -377,11 +409,11 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         trailing: ElevatedButton(
                           onPressed: () => _toggleFollow(user, isFollowing),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.deepPurple,
+                            backgroundColor: isFollowing ? Colors.grey : Colors.deepPurple,
                           ),
-                          child: const Text(
-                            'フォロー',
-                            style: TextStyle(color: Colors.white),
+                          child: Text(
+                            isFollowing ? 'フォロー中' : 'フォロー',
+                            style: const TextStyle(color: Colors.white),
                           ),
                         ),
                       );

@@ -4,8 +4,10 @@
 // 録音品質などのアプリケーション設定を管理する画面です
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recording_config.dart';
+import '../providers/theme_provider.dart';
 
 /// アプリケーション設定画面
 class SettingsScreen extends StatefulWidget {
@@ -67,25 +69,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         children: [
           // ========================================
+          // テーマ設定セクション
+          // ========================================
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              '表示設定',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) {
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: ListTile(
+                  leading: Icon(
+                    themeProvider.isDarkMode
+                        ? Icons.dark_mode
+                        : Icons.light_mode,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  title: const Text('ダークモード'),
+                  trailing: Switch(
+                    value: themeProvider.isDarkMode,
+                    onChanged: (value) {
+                      themeProvider.setDarkMode(value);
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+
+          const SizedBox(height: 32),
+
+          // ========================================
           // 録音品質設定セクション
           // ========================================
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Text(
               '録音設定',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.deepPurple,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Text(
               '音声メッセージの録音品質を選択してください',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
 
@@ -101,7 +145,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               elevation: isSelected ? 4 : 1,
-              color: isSelected ? Colors.deepPurple.shade50 : null,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
+                  : null,
               child: ListTile(
                 leading: Radio<RecordingQuality>(
                   value: quality,
@@ -129,11 +175,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       'サンプルレート: ${config.sampleRate}Hz | '
                       'ビットレート: ${config.bitRate ~/ 1000}kbps',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey[400]
+                            : Colors.grey[700],
+                      ),
                     ),
                     Text(
                       '推定ファイルサイズ: 約${config.estimatedSizePerMinute.toStringAsFixed(0)}KB/分',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey[400]
+                            : Colors.grey[700],
+                      ),
                     ),
                   ],
                 ),
@@ -151,32 +207,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.15)
+                  : Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.3),
+              ),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue),
-                    SizedBox(width: 8),
+                    Icon(
+                      Icons.info_outline,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       '録音品質について',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   '• 低品質：通話の録音に最適。データ通信量を節約できます。\n'
                   '• 中品質：バランスが良く、ほとんどの用途に適しています。（推奨）\n'
                   '• 高品質：音楽や高品質な録音が必要な場合に使用してください。',
-                  style: TextStyle(fontSize: 13, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[300]
+                        : Colors.black87,
+                  ),
                 ),
               ],
             ),

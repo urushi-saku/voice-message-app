@@ -30,6 +30,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   bool _isLoading = true;
   String? _error;
   bool _isSending = false;
+  bool _hasMarkedAsRead = false; // 既読処理済みフラグ（重複実行防止）
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -63,11 +64,56 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         _isLoading = false;
       });
       _scrollToBottom();
+      
+      // 初回読み込み時のみ、未読メッセージを自動で既読にする
+      if (!_hasMarkedAsRead) {
+        _hasMarkedAsRead = true;
+        _markAllAsRead();
+      }
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  // ========================================
+  // すべての未読メッセージを既読にする
+  // ========================================
+  Future<void> _markAllAsRead() async {
+    // 相手が送ったメッセージのみ対象（isMine == false）
+    // かつ未読（isRead == false）のメッセージを既読にする
+    for (final message in _messages) {
+      if (!message.isMine && !message.isRead) {
+        try {
+          await MessageService.markAsRead(message.id);
+        } catch (e) {
+          print('既読マーク失敗: ${message.id}, error: $e');
+        }
+      }
+    }
+    // 既読完了後、メッセージリストを再読み込みして画面を更新
+    if (mounted) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      _loadMessagesWithoutMarkingRead();
+    }
+  }
+
+  // ========================================
+  // メッセージ再読み込み（既読処理なし）
+  // ========================================
+  Future<void> _loadMessagesWithoutMarkingRead() async {
+    try {
+      final messages = await MessageService.getThreadMessages(widget.senderId);
+      if (mounted) {
+        setState(() {
+          _messages = messages;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      print('メッセージ再読み込みエラー: $e');
     }
   }
 
@@ -112,9 +158,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   // 音声メッセージ再生
   // ========================================
   void _openPlayback(MessageInfo message) {
-    if (!message.isRead && !message.isMine) {
-      MessageService.markAsRead(message.id).then((_) => _loadMessages());
-    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => VoicePlaybackScreen(message: message)),
@@ -279,32 +322,38 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: Colors.white,
-              backgroundImage: widget.senderProfileImage != null
-                  ? NetworkImage(widget.senderProfileImage!)
-                  : null,
-              child: widget.senderProfileImage == null
-                  ? Text(
-                      widget.senderUsername[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.deepPurple,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                widget.senderUsername,
-                overflow: TextOverflow.ellipsis,
+    return WillPopScope(
+      onWillPop: () async {
+        // 画面を戻る時にスレッド一覧を確実に更新するため、true を返す
+        // これにより親画面の .then((_) => _loadThreads()) が実行される
+        return true;
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.white,
+                backgroundImage: widget.senderProfileImage != null
+                    ? NetworkImage(widget.senderProfileImage!)
+                    : null,
+                child: widget.senderProfileImage == null
+                    ? Text(
+                        widget.senderUsername[0].toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.deepPurple,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  widget.senderUsername,
+                  overflow: TextOverflow.ellipsis,
+                ),
             ),
           ],
         ),
@@ -342,8 +391,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                 ),
                 _buildInputArea(),
               ],
-            ),
-    );
+            ),      ),    );
   }
 
   // ========================================

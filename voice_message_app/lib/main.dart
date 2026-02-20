@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_page.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -25,6 +26,7 @@ import 'services/fcm_service.dart';
 import 'services/offline_service.dart';
 import 'services/network_connectivity_service.dart';
 import 'services/sync_service.dart';
+import 'theme/app_theme.dart';
 
 // FlutterFire CLI生成のオプションファイル
 // 'flutterfire configure' 実行後に自動生成されます
@@ -93,6 +95,17 @@ void main() async {
     print('⚠️  Offline mode will not work');
   }
 
+  // ========================================
+  // テーマプロバイダー初期化
+  // ========================================
+  try {
+    final themeProvider = ThemeProvider();
+    await themeProvider.initialize();
+    print('✅ Theme Provider initialized');
+  } catch (e) {
+    print('❌ Theme Provider initialization error: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -119,10 +132,16 @@ class MyApp extends StatelessWidget {
     // ① MultiProvider で複数のProviderを登録
     return MultiProvider(
       providers: [
+        // テーマプロバイダー
+        // ChangeNotifierProvider(create: (_) => ThemeProvider()),
+
         // 認証状態を管理するProvider
         // AuthProvider()が初期化される
         // 全子ウィジェット（全画面）から Consumer<AuthProvider> でアクセス可能
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+
+        // テーマ設定を管理するProvider
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
 
         // ネットワーク接続状態を管理するProvider
         // NetworkConnectivityService が初期化される
@@ -134,24 +153,27 @@ class MyApp extends StatelessWidget {
         // オフラインメッセージの同期を管理
         ChangeNotifierProvider(create: (_) => SyncService()),
       ],
-      child: MaterialApp(
-        title: 'ボイスメッセージアプリ', // アプリのタイトル（日本語）
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
-          ), // 色のテーマ（deepPurpleを基調）
-          fontFamily: 'Noto Sans CJK JP', // システムにインストールされた日本語フォントを使用
-        ),
-        // ② 起動時に表示する画面 → AuthWrapper
-        // AuthWrapperが認証状態を確認して適切な画面を表示
-        home: const AuthWrapper(),
-
-        // ③ 名前付きルート（画面遷移時に使用）
-        // Navigator.pushNamed('/login') のような形式で遷移可能
-        routes: {
-          '/login': (context) => const LoginScreen(),
-          '/register': (context) => const RegisterScreen(),
-          '/home': (context) => const HomePage(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) {
+          return MaterialApp(
+            title: 'ボイスメッセージアプリ', // アプリのタイトル（日本語）
+            // ② テーマ設定（ダークモード対応）
+            theme: lightTheme(),
+            darkTheme: darkTheme(),
+            themeMode: themeProvider.isDarkMode
+                ? ThemeMode.dark
+                : ThemeMode.light,
+            // ③ 起動時に表示する画面 → AuthWrapper
+            // AuthWrapperが認証状態を確認して適切な画面を表示
+            home: const AuthWrapper(),
+            // ④ 名前付きルート（画面遷移時に使用）
+            // Navigator.pushNamed('/login') のような形式で遷移可能
+            routes: {
+              '/login': (context) => const LoginScreen(),
+              '/register': (context) => const RegisterScreen(),
+              '/home': (context) => const HomePage(),
+            },
+          );
         },
       ),
     );
