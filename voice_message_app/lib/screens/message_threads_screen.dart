@@ -204,15 +204,28 @@ class _MessageThreadsScreenState extends State<MessageThreadsScreen> {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(
-                                Icons.mic,
+                              Icon(
+                                thread.lastMessage.messageType == 'text'
+                                    ? Icons.chat_bubble_outline
+                                    : Icons.mic,
                                 size: 14,
                                 color: Colors.grey,
                               ),
                               const SizedBox(width: 4),
-                              Text(
-                                'ボイスメッセージ (${thread.totalCount}件)',
-                                style: const TextStyle(fontSize: 13),
+                              Expanded(
+                                child: Text(
+                                  thread.lastMessage.messageType == 'text'
+                                      ? (thread.lastMessage.textContent ?? '')
+                                      : 'ボイスメッセージ (${thread.totalCount}件)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: thread.unreadCount > 0
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
                               ),
                             ],
                           ),

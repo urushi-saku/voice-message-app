@@ -89,7 +89,8 @@ class AuthProvider extends ChangeNotifier {
   /// ゲッター経由でのみ読み取り可能
   User? _user; // ログイン中のユーザー情報
   String? _token; // JWT トークン
-  bool _isLoading = false; // ローディング状態
+  bool _isLoading = false; // ローディング状態（ログイン・登録ボタン用）
+  bool _isInitializing = true; // 初回トークン確認中フラグ（スプラッシュ画面で使用、ちらつき防止）
   String? _error; // エラーメッセージ
   bool _isAuthenticated = false; // ログイン状態
 
@@ -106,6 +107,11 @@ class AuthProvider extends ChangeNotifier {
   User? get user => _user;
   String? get token => _token;
   bool get isLoading => _isLoading;
+
+  /// 初回トークン確認中フラグ。
+  /// true の間はスプラッシュ画面を表示して、ログイン/未ログイン判定完了まで待機。
+  /// これにより、ホーム画面とログイン画面の不要な切り替わり（ちらつき）を防止。
+  bool get isInitializing => _isInitializing;
   String? get error => _error;
   bool get isAuthenticated => _isAuthenticated;
 
@@ -135,11 +141,13 @@ class AuthProvider extends ChangeNotifier {
   ///    - _isAuthenticated = false
   ///    - _token = null
   ///    - _user = null
-  /// 4. notifyListeners() で UI を更新
+  /// 4. _isInitializing = false で確認完了を示す（スプラッシュ画面を閉じる）
+  /// 5. notifyListeners() で UI を更新
   ///
   /// 【用途】
   /// アプリ起動時に自動実行され、以前ログインしていた場合は
-  /// ホーム画面を表示し、未ログインの場合はログイン画面を表示
+  /// ホーム画面を表示し、未ログインの場合はログイン画面を表示する。
+  /// 確認中はスプラッシュ画面を表示してちらつき（フリッカー）を防止。
   Future<void> _initializeAuth() async {
     try {
       final token = await AuthService.getToken();
@@ -158,6 +166,7 @@ class AuthProvider extends ChangeNotifier {
       _token = null;
       _user = null;
     }
+    _isInitializing = false; // 初回確認完了
     notifyListeners();
   }
 

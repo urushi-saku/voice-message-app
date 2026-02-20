@@ -207,10 +207,13 @@ class ProfilePage extends StatelessWidget {
                               TextButton(
                                 onPressed: () {
                                   Navigator.of(context).pop();
+                                  // 先にナビゲーション先を確保してからログアウト
+                                  final nav = Navigator.of(context);
                                   authProvider.logout().then((_) {
-                                    Navigator.of(
-                                      context,
-                                    ).pushReplacementNamed('/login');
+                                    nav.pushNamedAndRemoveUntil(
+                                      '/login',
+                                      (route) => false,
+                                    );
                                   });
                                 },
                                 child: const Text(

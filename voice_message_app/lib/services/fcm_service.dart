@@ -48,14 +48,16 @@ class FcmService {
       // ① flutter_local_notifications 初期化
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
-      const InitializationSettings initSettings =
-          InitializationSettings(android: androidSettings);
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidSettings,
+      );
       await _localNotifications.initialize(initSettings);
 
       // Android 8+ (API 26+) 向けに通知チャンネルを作成
       await _localNotifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(_channel);
 
       print('✅ 通知チャンネル "voice_messages" を作成しました');
@@ -78,15 +80,13 @@ class FcmService {
         return;
       }
 
-      // ②FCMトークンを取得
+      // ②FCMトークンを取得（ログ確認のみ。送信はログイン後に sendTokenAfterLogin() が担当）
       String? token = await _firebaseMessaging.getToken();
       if (token != null) {
         print('📱 FCMトークン取得: $token');
-        // ③サーバーにトークンを送信
-        await _sendTokenToServer(token);
       }
 
-      // トークン更新時のリスナー
+      // トークン更新時のリスナー（ログイン済みの場合のみサーバーへ送信）
       _firebaseMessaging.onTokenRefresh.listen((newToken) {
         print('🔄 FCMトークンが更新されました: $newToken');
         _sendTokenToServer(newToken);

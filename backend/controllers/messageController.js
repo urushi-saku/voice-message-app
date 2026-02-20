@@ -580,7 +580,7 @@ exports.getMessageThreads = async (req, res) => {
       let partnerId, partnerUsername, partnerProfileImage;
       if (isMine) {
         // 自分が送った → 受信者が相手（複数の場合は最初の1人）
-        const partner = message.receivers.find(r => r._id.toString() !== userId);
+        const partner = message.receivers.find(r => r && r._id && r._id.toString() !== userId);
         if (!partner) return;
         partnerId = partner._id.toString();
         partnerUsername = partner.username;
@@ -596,15 +596,15 @@ exports.getMessageThreads = async (req, res) => {
         // 未読数（受信したメッセージのみカウント）
         const unreadCount = messages.filter(m => {
           if (m.sender._id.toString() !== partnerId) return false;
-          if (!m.receivers.some(r => r._id.toString() === userId)) return false;
+          if (!m.receivers.some(r => r && r._id && r._id.toString() === userId)) return false;
           const rs = m.readStatus.find(rs => rs.user.toString() === userId);
           return rs ? !rs.isRead : true;
         }).length;
 
         const totalCount = messages.filter(m => {
           const mid = m.sender._id.toString();
-          const hasPartner = m.receivers.some(r => r._id.toString() === partnerId);
-          const hasMe    = m.receivers.some(r => r._id.toString() === userId);
+          const hasPartner = m.receivers.some(r => r && r._id && r._id.toString() === partnerId);
+          const hasMe    = m.receivers.some(r => r && r._id && r._id.toString() === userId);
           return (mid === partnerId && hasMe) || (mid === userId && hasPartner);
         }).length;
 

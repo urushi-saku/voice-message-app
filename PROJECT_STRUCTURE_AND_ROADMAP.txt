@@ -831,4 +831,5 @@ voice-message-app/
 
 ================================================================================
 実行コマンド
+usbipd attach --wsl --busid 1-1 --auto-attach
 cd /home/xiaox/voice-message-app && ./dev.sh

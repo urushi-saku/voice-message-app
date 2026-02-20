@@ -155,5 +155,18 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
+// ========================================
+// グローバルエラーハンドラー（サーバークラッシュ防止）
+// ========================================
+process.on('uncaughtException', (err) => {
+  console.error('【致命的エラー】uncaughtException:', err);
+  // プロセスを終了させない（サーバーを継続稼働）
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('【警告】unhandledRejection:', reason, 'at:', promise);
+  // プロセスを終了させない（サーバーを継続稼働）
+});
+
 // テスト用にエクスポート
 module.exports = app;

@@ -20,6 +20,7 @@
 // - Consumer<AuthProvider>: ログイン状態監視・ボタン操作
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
@@ -139,6 +140,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (success && mounted) {
+        // パスワードマネージャーに保存を促す
+        TextInput.finishAutofillContext();
         // ログイン成功時、ホーム画面に遷移
         Navigator.of(context).pushReplacementNamed('/home');
       } else if (mounted) {
@@ -188,99 +191,103 @@ class _LoginScreenState extends State<LoginScreen> {
                 // ========================================
                 Form(
                   key: _formKey,
-                  child: Column(
-                    children: [
-                      // メールアドレス入力フィールド
-                      TextFormField(
-                        controller: _emailController,
-                        validator: _validateEmail,
-                        decoration: InputDecoration(
-                          labelText: 'メールアドレス',
-                          hintText: 'example@example.com',
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // パスワード入力フィールド
-                      TextFormField(
-                        controller: _passwordController,
-                        validator: _validatePassword,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'パスワード',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
+                  child: AutofillGroup(
+                    child: Column(
+                      children: [
+                        // メールアドレス入力フィールド
+                        TextFormField(
+                          controller: _emailController,
+                          validator: _validateEmail,
+                          autofillHints: const [AutofillHints.email],
+                          decoration: InputDecoration(
+                            labelText: 'メールアドレス',
+                            hintText: 'example@example.com',
+                            prefixIcon: const Icon(Icons.email_outlined),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
+                            filled: true,
+                            fillColor: Colors.grey[50],
                           ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
+                          keyboardType: TextInputType.emailAddress,
                         ),
-                      ),
-                      const SizedBox(height: 32),
+                        const SizedBox(height: 16),
 
-                      // ========================================
-                      // ログインボタン
-                      // ========================================
-                      Consumer<AuthProvider>(
-                        builder: (context, authProvider, _) {
-                          return SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              onPressed: authProvider.isLoading
-                                  ? null
-                                  : _handleLogin,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.deepPurple,
-                                disabledBackgroundColor: Colors.grey[400],
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                        // パスワード入力フィールド
+                        TextFormField(
+                          controller: _passwordController,
+                          validator: _validatePassword,
+                          obscureText: _obscurePassword,
+                          autofillHints: const [AutofillHints.password],
+                          decoration: InputDecoration(
+                            labelText: 'パスワード',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
                               ),
-                              child: authProvider.isLoading
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                      ),
-                                    )
-                                  : const Text(
-                                      'ログイン',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // ========================================
+                        // ログインボタン
+                        // ========================================
+                        Consumer<AuthProvider>(
+                          builder: (context, authProvider, _) {
+                            return SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                onPressed: authProvider.isLoading
+                                    ? null
+                                    : _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.deepPurple,
+                                  disabledBackgroundColor: Colors.grey[400],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: authProvider.isLoading
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'ログイン',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 

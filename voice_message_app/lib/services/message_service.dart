@@ -658,17 +658,27 @@ class MessageService {
       throw Exception('認証が必要です');
     }
 
-    final response = await http.get(
-      Uri.parse('$BASE_URL/messages/threads'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$BASE_URL/messages/threads'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
 
-    if (response.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(response.body);
-      return jsonList.map((json) => ThreadInfo.fromJson(json)).toList();
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'スレッド一覧の取得に失敗しました');
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        return jsonList.map((json) => ThreadInfo.fromJson(json)).toList();
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'スレッド一覧の取得に失敗しました');
+      }
+    } on SocketException {
+      throw Exception('サーバーに接続できません。バックエンドが起動しているか確認してください。');
+    } on TimeoutException {
+      throw Exception('接続がタイムアウトしました。再度お試しください。');
+    } on http.ClientException {
+      throw Exception('通信エラーが発生しました。ネットワーク接続を確認してください。');
     }
   }
 
@@ -691,17 +701,27 @@ class MessageService {
       throw Exception('認証が必要です');
     }
 
-    final response = await http.get(
-      Uri.parse('$BASE_URL/messages/thread/$senderId'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$BASE_URL/messages/thread/$senderId'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
 
-    if (response.statusCode == 200) {
-      final List<dynamic> jsonList = jsonDecode(response.body);
-      return jsonList.map((json) => MessageInfo.fromJson(json)).toList();
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'メッセージの取得に失敗しました');
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        return jsonList.map((json) => MessageInfo.fromJson(json)).toList();
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'メッセージの取得に失敗しました');
+      }
+    } on SocketException {
+      throw Exception('サーバーに接続できません。バックエンドが起動しているか確認してください。');
+    } on TimeoutException {
+      throw Exception('接続がタイムアウトしました。再度お試しください。');
+    } on http.ClientException {
+      throw Exception('通信エラーが発生しました。ネットワーク接続を確認してください。');
     }
   }
 }

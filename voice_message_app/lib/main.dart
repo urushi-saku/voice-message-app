@@ -183,9 +183,9 @@ class AuthWrapper extends StatelessWidget {
     // ① AuthProvider を監視
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        // ② 初期化中（トークン確認中）
-        // 保存トークンの確認が完了するまでローディング表示
-        if (authProvider.isLoading) {
+        // ② 初期化中（起動時のトークン確認中のみ）
+        // isLoading（ログイン操作中）では切り替えない → LoginScreenがアンマウントされるのを防ぐ
+        if (authProvider.isInitializing) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
