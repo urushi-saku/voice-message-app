@@ -23,6 +23,7 @@ import 'screens/home_page.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'services/fcm_service.dart';
+import 'services/navigation_service.dart';
 import 'services/offline_service.dart';
 import 'services/network_connectivity_service.dart';
 import 'services/sync_service.dart';
@@ -157,6 +158,8 @@ class MyApp extends StatelessWidget {
         builder: (context, themeProvider, _) {
           return MaterialApp(
             title: 'ボイスメッセージアプリ', // アプリのタイトル（日本語）
+            // グローバルNavigatorKey（FCMなどウィジェット外からの遷移に使用）
+            navigatorKey: NavigationService.navigatorKey,
             // ② テーマ設定（ダークモード対応）
             theme: lightTheme(),
             darkTheme: darkTheme(),

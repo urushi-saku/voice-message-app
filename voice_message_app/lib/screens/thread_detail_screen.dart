@@ -32,6 +32,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   bool _isSending = false;
   bool _hasMarkedAsRead = false; // 既読処理済みフラグ（重複実行防止）
 
+  // 送信者の表示情報（通知の初期値をAPIで上書きする）
+  late String _displayName;
+  String? _displayProfileImage;
+
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -39,6 +43,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   void initState() {
     super.initState();
     timeago.setLocaleMessages('ja', timeago.JaMessages());
+    _displayName = widget.senderUsername;
+    _displayProfileImage = widget.senderProfileImage;
     _loadMessages();
   }
 
@@ -64,7 +70,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         _isLoading = false;
       });
       _scrollToBottom();
-      
+
       // 初回読み込み時のみ、未読メッセージを自動で既読にする
       if (!_hasMarkedAsRead) {
         _hasMarkedAsRead = true;
@@ -194,12 +200,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.deepPurple,
-              backgroundImage: widget.senderProfileImage != null
-                  ? NetworkImage(widget.senderProfileImage!)
+              backgroundImage: _displayProfileImage != null
+                  ? NetworkImage(_displayProfileImage!)
                   : null,
-              child: widget.senderProfileImage == null
+              child: _displayProfileImage == null
                   ? Text(
-                      widget.senderUsername[0].toUpperCase(),
+                      _displayName.isNotEmpty
+                          ? _displayName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -243,9 +251,30 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                       : _buildVoiceBubble(message, isMe),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  timeago.format(message.sentAt, locale: 'ja'),
-                  style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: isMe
+                      ? MainAxisAlignment.end
+                      : MainAxisAlignment.start,
+                  children: [
+                    // 既読表示（自分の送信メッセージのみ）
+                    if (isMe && message.isRead) ...
+                      [
+                        Text(
+                          '既読',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.deepPurple[300],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    Text(
+                      timeago.format(message.sentAt, locale: 'ja'),
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -335,12 +364,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: Colors.white,
-                backgroundImage: widget.senderProfileImage != null
-                    ? NetworkImage(widget.senderProfileImage!)
+                backgroundImage: _displayProfileImage != null
+                    ? NetworkImage(_displayProfileImage!)
                     : null,
-                child: widget.senderProfileImage == null
+                child: _displayProfileImage == null
                     ? Text(
-                        widget.senderUsername[0].toUpperCase(),
+                        _displayName.isNotEmpty
+                            ? _displayName[0].toUpperCase()
+                            : '?',
                         style: const TextStyle(
                           color: Colors.deepPurple,
                           fontWeight: FontWeight.bold,
@@ -350,48 +381,47 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  widget.senderUsername,
-                  overflow: TextOverflow.ellipsis,
-                ),
-            ),
-          ],
+                child: Text(_displayName, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
         ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text('エラー: $_error'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadMessages,
+                      child: const Text('再読み込み'),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
                 children: [
-                  Text('エラー: $_error'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadMessages,
-                    child: const Text('再読み込み'),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _loadMessages,
+                      child: _messages.isEmpty
+                          ? const Center(child: Text('まだメッセージはありません'))
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              itemCount: _messages.length,
+                              itemBuilder: (_, i) => _buildBubble(_messages[i]),
+                            ),
+                    ),
                   ),
+                  _buildInputArea(),
                 ],
               ),
-            )
-          : Column(
-              children: [
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _loadMessages,
-                    child: _messages.isEmpty
-                        ? const Center(child: Text('まだメッセージはありません'))
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            itemCount: _messages.length,
-                            itemBuilder: (_, i) => _buildBubble(_messages[i]),
-                          ),
-                  ),
-                ),
-                _buildInputArea(),
-              ],
-            ),      ),    );
+      ),
+    );
   }
 
   // ========================================

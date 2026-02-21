@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'auth_service.dart';
+import 'navigation_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -51,7 +52,22 @@ class FcmService {
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
       );
-      await _localNotifications.initialize(initSettings);
+      await _localNotifications.initialize(
+        initSettings,
+        // フォアグラウンド表示のローカル通知をタップした時のコールバック
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          print('🔔 ローカル通知をタップ: payload=${response.payload}');
+          if (response.payload != null && response.payload!.isNotEmpty) {
+            try {
+              final data =
+                  jsonDecode(response.payload!) as Map<String, dynamic>;
+              NavigationService.navigateFromNotification(data);
+            } catch (e) {
+              print('❌ ローカル通知payloadの解析エラー: $e');
+            }
+          }
+        },
+      );
 
       // Android 8+ (API 26+) 向けに通知チャンネルを作成
       await _localNotifications
@@ -205,6 +221,9 @@ class FcmService {
     if (notification == null) return;
 
     // フォアグラウンド時にローカル通知として表示
+    // payload にナビゲーション用データを JSON で埋め込む
+    final payload = message.data.isNotEmpty ? jsonEncode(message.data) : null;
+
     _localNotifications.show(
       message.hashCode,
       notification.title,
@@ -219,6 +238,7 @@ class FcmService {
           icon: '@mipmap/ic_launcher',
         ),
       ),
+      payload: payload,
     );
   }
 
@@ -226,18 +246,16 @@ class FcmService {
   /// 通知をタップした時の処理
   /// ========================================
   static void _handleNotificationTap(RemoteMessage message) {
-    // ここで通知をタップした時の処理を実装
-    // 例：特定の画面に遷移する
-
     final data = message.data;
-    if (data.containsKey('type') && data['type'] == 'new_message') {
-      final messageId = data['messageId'];
-      final senderId = data['senderId'];
-      print('📨 メッセージ通知をタップ: messageId=$messageId, senderId=$senderId');
+    final type = data['type'];
+    final senderId = data['senderId'];
+    print('🔔 通知タップ処理: type=$type, senderId=$senderId');
 
-      // ここでメッセージ画面に遷移する処理を追加できる
-      // 例：NavigatorService.navigateToMessage(messageId);
-    }
+    // NavigationService 経由で適切な画面へ遷移
+    // アプリ起動直後はナビゲーターが未準備の場合があるため少し待つ
+    Future.delayed(const Duration(milliseconds: 500), () {
+      NavigationService.navigateFromNotification(data);
+    });
   }
 
   /// ========================================

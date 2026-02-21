@@ -665,9 +665,22 @@ exports.getThreadMessages = async (req, res) => {
 
     const result = messages.map(message => {
       const isMine = message.sender._id.toString() === userId;
-      const readStatus = isMine
-        ? null
-        : message.readStatus.find(rs => rs.user.toString() === userId);
+      let isRead, readAt;
+      if (isMine) {
+        // 自分が送ったメッセージ → 相手（partnerId）が既読したかを返す
+        const receiverStatus = message.readStatus.find(
+          rs => rs.user.toString() === partnerId
+        );
+        isRead = receiverStatus ? receiverStatus.isRead : false;
+        readAt = receiverStatus ? receiverStatus.readAt : null;
+      } else {
+        // 相手から受信したメッセージ → 自分が既読したかを返す
+        const myStatus = message.readStatus.find(
+          rs => rs.user.toString() === userId
+        );
+        isRead = myStatus ? myStatus.isRead : false;
+        readAt = myStatus ? myStatus.readAt : null;
+      }
       return {
         _id: message._id,
         sender: {
@@ -683,8 +696,8 @@ exports.getThreadMessages = async (req, res) => {
         duration: message.duration,
         mimeType: message.mimeType,
         sentAt: message.sentAt,
-        isRead: isMine ? true : (readStatus ? readStatus.isRead : false),
-        readAt: readStatus ? readStatus.readAt : null
+        isRead,
+        readAt
       };
     });
 
