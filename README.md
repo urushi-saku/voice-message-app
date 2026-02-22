@@ -20,6 +20,7 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
 - **フェーズ3（メッセージング機能強化）**: ✅ **完了** 🎉
 - **フェーズ4（高度な機能）**: ✅ **完了**（オフラインモード、プロフィール機能、録音品質設定）
 - **フェーズ6（UI/UX改善）**: ✅ **完了**（ダークモード、アニメーション、アクセシビリティ、レスポンシブ）
+- **コードアーキテクチャ改善**: ✅ **完了**（責務分割リファクタリング）
 - **フェーズ5・7**: 未着手
 
 ## ✨ 実装済み機能
@@ -140,6 +141,17 @@ Flutter製モバイルアプリとNode.js（Express）+ MongoDB バックエン�
   - 画面向き（縦/横）対応
   - テキスト・パディング自動スケール
   - グリッドレイアウト自動調整
+
+### 🏗️ コードアーキテクチャ 🆕
+
+- **責務分割リファクタリング**
+  - `models/message.dart`: `MessageInfo`/`ThreadInfo` をサービスから独立
+  - `providers/message_provider.dart`: メッセージ取得・送信・削除・既読処理を集約
+  - `providers/recording_provider.dart`: 録音/再生/送信ロジックを Screen から分離
+  - `widgets/message_bubble.dart`: チャットバブル・TailPainter を再利用可能 Widget に
+  - `widgets/message_options_sheet.dart`: 長押しオプション・削除確認ダイアログを独立
+  - `widgets/voice_messages_panel.dart`: 右スワイプパネルを独立
+  - `thread_detail_screen.dart`: **1242行 → 474行（-62%）**
 
 ### 📱 オフラインモード 🆕
 

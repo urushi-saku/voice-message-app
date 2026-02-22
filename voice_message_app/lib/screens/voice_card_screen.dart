@@ -5,6 +5,7 @@
 // 横3列グリッドで一覧表示します
 
 import 'package:flutter/material.dart';
+import '../models/message.dart';
 import '../services/message_service.dart';
 import 'followers_tab.dart';
 import 'voice_playback_screen.dart';

@@ -3,7 +3,7 @@
 プロジェクト構成と実装ロードマップ
 ================================================================================
 
-更新日: 2026年2月21日
+更新日: 2026年2月22日
 プロジェクト根: /home/xiaox/voice-message-app
 
 【最新状況】
@@ -15,6 +15,7 @@
 フェーズ4（録音品質設定）: 完了 ✅
 フェーズ6（UI/UX改善）: 完了 ✅
 FCM通知タップ時の画面遷移: 完了 ✅
+コードアーキテクチャリファクタリング: 完了 ✅
 フェーズ5・7: 未着手
 
 
@@ -98,10 +99,9 @@ voice-message-app/
     │   │   ├── register_screen.dart  # 登録画面 ✅
     │   │   │   └── ユーザー登録処理
     │   │   │
-    │   │   ├── recording_screen.dart # 録音画面 ✅
-    │   │   │   ├── 音声録音UI
-    │   │   │   ├── MessageService統合
-    │   │   │   ├── 複数受信者への送信
+    │   │   ├── recording_screen.dart # 録音画面 ✅【リファクタ済】
+    │   │   │   ├── 音声録音UI（アニメーション・レイアウトのみ）
+    │   │   │   ├── RecordingProvider への委譲
     │   │   │   └── 録音品質表示 ✅
     │   │   │
     │   │   ├── select_follower_screen.dart # フォロワー選択画面 ✅
@@ -140,6 +140,13 @@ voice-message-app/
     │   │   │   ├── プロフィール画像選択
     │   │   │   ├── 画像プレビュー
     │   │   │   └── 保存機能
+    │   │   │
+    │   │   ├── thread_detail_screen.dart # スレッド詳細（チャット）画面 ✅【リファクタ済】
+    │   │   │   ├── AppBar・入力エリア・リスト表示（UIのみ）
+    │   │   │   ├── MessageProvider への委譲
+    │   │   │   ├── MessageBubble ウィジェット使用
+    │   │   │   ├── VoiceMessagesPanel ウィジェット使用
+    │   │   │   └── 1242行 → 474行 (-62%)
     │   │   │
     │   │   └── settings_screen.dart # 設定画面 ✅
     │   │       ├── 録音品質選択
@@ -211,6 +218,10 @@ voice-message-app/
     │   │   └── api_service.dart      # サーバー通信管理（旧バージョン）
     │   │
     │   ├── models/                   # データモデル ✅
+    │   │   ├── message.dart          # メッセージモデル ✅【NEW・リファクタ済】
+    │   │   │   ├── MessageInfo         # メッセージ情報（fromJson含む）
+    │   │   │   └── ThreadInfo          # スレッド情報（fromJson含む）
+    │   │   │
     │   │   ├── offline_model.dart    # オフラインデータモデル
     │   │   │   ├── OfflineMessage      # 送信待機メッセージ
     │   │   │   ├── CachedUserInfo      # ユーザーキャッシュ
@@ -231,27 +242,38 @@ voice-message-app/
     │   │       └── darkTheme()         # ダークモード
     │   │
     │   ├── widgets/                  # 共通ウィジェット ✅
+    │   │   ├── message_bubble.dart   # チャットバブルUI ✅【NEW・リファクタ済】
+    │   │   │   ├── MessageBubble       # バブル全体（アバター・しっぽ含む）
+    │   │   │   ├── MessageTimestamp    # 時刻・既読表示
+    │   │   │   ├── VoiceBubbleContent  # ボイスメッセージの中身
+    │   │   │   └── TailPainter         # 吹き出しのしっぽ（CustomPainter）
+    │   │   ├── message_options_sheet.dart # メッセージオプション ✅【NEW・リファクタ済】
+    │   │   │   ├── showMessageOptionsSheet() # 長押しボトムシート
+    │   │   │   └── 削除確認ダイアログ
+    │   │   ├── voice_messages_panel.dart # ボイス一覧パネル ✅【NEW・リファクタ済】
+    │   │   │   ├── VoiceMessagesPanel  # 右スワイプで表示されるパネル
+    │   │   │   └── VoiceMessageCard    # グリッド内カード1枚
     │   │   ├── offline_banner.dart   # オフラインバナー
     │   │   │   ├── OfflineBanner       # オフライン状態表示
     │   │   │   ├── NetworkStatusIndicator # ネットワーク状態
     │   │   │   └── OfflineInfoBottomSheet # 詳細情報
-    │   │   ├── custom_page_route.dart # ページ遷移アニメーション ✅【NEW】
+    │   │   ├── custom_page_route.dart # ページ遷移アニメーション ✅
     │   │   │   ├── SlideUpPageRoute     # スライドアップ
     │   │   │   ├── FadeSlidePageRoute   # フェードスライド
     │   │   │   └── ScaleFadePageRoute   # スケールフェード
-    │   │   ├── animated_widgets.dart # アニメーション強化 ✅【NEW】
+    │   │   ├── animated_widgets.dart # アニメーション強化 ✅
     │   │   │   ├── AnimatedLoadingIndicator # ローディング表示
     │   │   │   ├── PulseAnimation        # パルス効果
     │   │   │   ├── RotatingAnimation     # 回転アニメーション
     │   │   │   ├── SlideInAnimation      # スライドイン
     │   │   │   └── AnimatedButton        # ボタンテップ効果
-    │   │   ├── accessible_widgets.dart # アクセシビリティ ✅【NEW】
+    │   │   ├── accessible_widgets.dart # アクセシビリティ ✅
     │   │   │   ├── AccessibleButton      # スクリーンリーダー対応
     │   │   │   ├── AccessibleTextField   # テキスト入力
     │   │   │   ├── MinimumTouchSize      # タッチサイズ最小化
     │   │   │   ├── AccessibleText        # 高コントラスト対応
     │   │   │   └── SkipNavigation        # スキップリンク
-    │   │   └── responsive_layout.dart # レスポンシブ対応 ✅【NEW】
+    │   │   └── responsive_layout.dart # レスポンシブ対応 ✅
     │   │       ├── ResponsiveLayout      # 画面サイズ適応
     │   │       ├── ResponsiveGridView    # グリッド適応
     │   │       ├── ResponsiveText        # テキストスケール
@@ -260,7 +282,16 @@ voice-message-app/
     │   │
     │   └── providers/                # 状態管理 ✅
     │       ├── auth_provider.dart    # 認証状態管理
-    │       └── theme_provider.dart   # テーマ状態管理 ✅【NEW】
+    │       ├── theme_provider.dart   # テーマ状態管理 ✅
+    │       ├── message_provider.dart # メッセージ状態管理 ✅【NEW・リファクタ済】
+    │       │   ├── loadMessages()    # スレッドメッセージ取得＋初回既読化
+    │       │   ├── sendText()        # テキスト送信
+    │       │   └── deleteMessage()   # メッセージ削除
+    │       └── recording_provider.dart # 録音状態管理 ✅【NEW・リファクタ済】
+    │           ├── startRecording() / stopRecording()
+    │           ├── togglePlay()      # 再生/停止
+    │           ├── send()            # 送信
+    │           └── setThumbnailPath() # サムネイル設定
     │
     ├── test/                         # テストコード
     │   └── widget_test.dart          # ウィジェットテスト

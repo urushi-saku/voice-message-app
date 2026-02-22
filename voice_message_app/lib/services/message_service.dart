@@ -3,6 +3,8 @@
 // ========================================
 // メッセージ送信、受信リスト取得、既読管理などの
 // バックエンドAPIと通信する機能を提供します
+//
+// ※ MessageInfo / ThreadInfo は models/message.dart へ移動済み
 
 import 'dart:async';
 import 'dart:convert';
@@ -14,119 +16,7 @@ import 'package:uuid/uuid.dart';
 import 'auth_service.dart';
 import 'offline_service.dart';
 import 'package:voice_message_app/models/offline_model.dart';
-
-/// メッセージ情報を表すクラス
-class MessageInfo {
-  final String id;
-  final String senderId;
-  final String senderUsername;
-  final String? senderProfileImage;
-  final String messageType; // 'voice' | 'text'
-  final String? textContent;
-  final bool isMine;
-  final String filePath;
-  final int fileSize;
-  final int? duration;
-  final String mimeType;
-  final String? thumbnailUrl; // 添付画像 URL
-  final DateTime sentAt;
-  final bool isRead;
-  final DateTime? readAt;
-
-  MessageInfo({
-    required this.id,
-    required this.senderId,
-    required this.senderUsername,
-    this.senderProfileImage,
-    this.messageType = 'voice',
-    this.textContent,
-    this.isMine = false,
-    required this.filePath,
-    required this.fileSize,
-    this.duration,
-    required this.mimeType,
-    this.thumbnailUrl,
-    required this.sentAt,
-    required this.isRead,
-    this.readAt,
-  });
-
-  /// JSONからMessageInfoオブジェクトを生成
-  factory MessageInfo.fromJson(Map<String, dynamic> json) {
-    // attachedImage は 「uploads/timestamp-xxx.jpg」 なパスで返ってくる
-    // /voice/:filename エンドポイントで配信する
-    final rawAttached = json['attachedImage'] as String?;
-    final thumbnailUrl = rawAttached != null && rawAttached.isNotEmpty
-        ? '$BASE_URL/voice/${rawAttached.split('/').last}'
-        : null;
-    return MessageInfo(
-      id: json['_id'],
-      senderId: json['sender']['_id'] ?? json['sender'],
-      senderUsername: json['sender']['username'] ?? 'Unknown',
-      senderProfileImage: json['sender']['profileImage'],
-      messageType: json['messageType'] ?? 'voice',
-      textContent: json['textContent'],
-      isMine: json['isMine'] ?? false,
-      filePath: json['filePath'] ?? '',
-      fileSize: json['fileSize'] ?? 0,
-      duration: json['duration'],
-      mimeType: json['mimeType'] ?? 'audio/mpeg',
-      thumbnailUrl: thumbnailUrl,
-      sentAt: DateTime.parse(json['sentAt']),
-      isRead: json['isRead'] ?? false,
-      readAt: json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
-    );
-  }
-}
-
-/// スレッド情報を表すクラス
-class ThreadInfo {
-  final String senderId;
-  final String senderUsername;
-  final String? senderProfileImage;
-  final MessageInfo lastMessage;
-  final int unreadCount;
-  final int totalCount;
-  final DateTime lastMessageAt;
-
-  ThreadInfo({
-    required this.senderId,
-    required this.senderUsername,
-    this.senderProfileImage,
-    required this.lastMessage,
-    required this.unreadCount,
-    required this.totalCount,
-    required this.lastMessageAt,
-  });
-
-  /// JSONからThreadInfoオブジェクトを生成
-  factory ThreadInfo.fromJson(Map<String, dynamic> json) {
-    return ThreadInfo(
-      senderId: json['sender']['_id'],
-      senderUsername: json['sender']['username'],
-      senderProfileImage: json['sender']['profileImage'],
-      lastMessage: MessageInfo(
-        id: json['lastMessage']['_id'],
-        senderId: json['sender']['_id'],
-        senderUsername: json['sender']['username'],
-        senderProfileImage: json['sender']['profileImage'],
-        messageType: json['lastMessage']['messageType'] ?? 'voice',
-        textContent: json['lastMessage']['textContent'],
-        isMine: json['lastMessage']['isMine'] ?? false,
-        filePath: '',
-        fileSize: 0,
-        duration: json['lastMessage']['duration'],
-        mimeType: 'audio/mpeg',
-        sentAt: DateTime.parse(json['lastMessage']['sentAt']),
-        isRead: json['lastMessage']['isRead'] ?? false,
-        readAt: null,
-      ),
-      unreadCount: json['unreadCount'],
-      totalCount: json['totalCount'],
-      lastMessageAt: DateTime.parse(json['lastMessageAt']),
-    );
-  }
-}
+import 'package:voice_message_app/models/message.dart';
 
 class MessageService {
   /// ========================================

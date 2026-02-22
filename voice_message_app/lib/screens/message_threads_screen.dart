@@ -4,6 +4,7 @@
 // 送信者ごとにグループ化されたメッセージの一覧を表示します
 
 import 'package:flutter/material.dart';
+import '../models/message.dart';
 import '../services/message_service.dart';
 import 'select_follower_screen.dart';
 import 'thread_detail_screen.dart';

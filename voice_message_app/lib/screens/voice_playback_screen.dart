@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../models/message.dart';
 import '../services/message_service.dart';
 import '../models/audio_effects.dart';
 import '../widgets/audio_effects_panel.dart';

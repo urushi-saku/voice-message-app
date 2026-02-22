@@ -1,15 +1,19 @@
 // ========================================
 // 録音画面（ボイスメッセージ送信用）
 // ========================================
+// 【責務】
+// - 録音・再生のアニメーション表示（UI）
+// - AppBar・ビジュアルエリア・コントロールパネルのレイアウト
+// - 送信結果に応じた SnackBar 表示 / 画面遷移
+//
+// 【委譲先】
+// - RecordingProvider : 録音・再生・送信のビジネスロジック・状態管理
 
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/audio_service.dart';
-import '../services/message_service.dart';
+import '../providers/recording_provider.dart';
 import '../models/recording_config.dart';
 
 class RecordingScreen extends StatefulWidget {
@@ -30,36 +34,39 @@ class RecordingScreen extends StatefulWidget {
 
 class _RecordingScreenState extends State<RecordingScreen>
     with TickerProviderStateMixin {
-  bool _isRecording = false;
-  bool _hasRecording = false;
-  bool _isPlaying = false;
-  bool _isSending = false;
-  String? _recordedPath;
-  String? _thumbnailPath;
-  int _recordSeconds = 0;
-  Timer? _timer;
+  // ========================================
+  // ビジネスロジック（Provider）
+  // ========================================
+  late final RecordingProvider _provider;
 
-  final AudioService _audioService = AudioService();
-  final ImagePicker _imagePicker = ImagePicker();
-  RecordingQuality _currentQuality = RecordingQuality.medium;
-
-  // アニメーション
-  late AnimationController _pulseController;
-  late AnimationController _waveController;
+  // ========================================
+  // UI 専用: アニメーション（TickerProvider が必要なため Screen に残す）
+  // ========================================
+  late AnimationController _pulseController; // 同心円パルス（録音中）
+  late AnimationController _waveController;  // 波形バーアニメーション（再生中）
   late List<Animation<double>> _waveAnimations;
 
+  final ImagePicker _imagePicker = ImagePicker();
+
+  // ========================================
+  // ライフサイクル
+  // ========================================
   @override
   void initState() {
     super.initState();
-    _loadRecordingQuality();
 
-    // 同心円パルス（録音中）
+    // Provider 生成・変更通知を受けて setState
+    _provider = RecordingProvider();
+    _provider.addListener(_onProviderChanged);
+    _provider.loadRecordingQuality();
+
+    // 同心円パルス（録音中に repeat）
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat();
 
-    // 波形バーアニメーション（再生中）
+    // 波形バーアニメーション（再生中に repeat）
     _waveController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -78,139 +85,27 @@ class _RecordingScreenState extends State<RecordingScreen>
     });
   }
 
-  Future<void> _loadRecordingQuality() async {
-    final prefs = await SharedPreferences.getInstance();
-    final qualityIndex = prefs.getInt('recording_quality') ?? 1;
-    setState(() {
-      _currentQuality = RecordingQuality.values[qualityIndex];
-    });
-    _audioService.setQuality(_currentQuality);
-  }
-
-  // ========================================
-  // タイマー
-  // ========================================
-  void _startTimer() {
-    _recordSeconds = 0;
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _recordSeconds++);
-    });
-  }
-
-  void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
-  }
-
-  String get _timerText {
-    final m = _recordSeconds ~/ 60;
-    final s = _recordSeconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
-  }
-
-  // ========================================
-  // 録音開始
-  // ========================================
-  Future<void> _startRecording() async {
-    try {
-      await _audioService.startRecording();
-      _startTimer();
-      setState(() {
-        _isRecording = true;
-        _hasRecording = false;
-      });
-    } catch (e) {
-      _showError('マイクへのアクセスを許可してください');
-    }
-  }
-
-  // ========================================
-  // 録音停止
-  // ========================================
-  Future<void> _stopRecording() async {
-    try {
-      final path = await _audioService.stopRecording();
-      _stopTimer();
-      setState(() {
-        _isRecording = false;
-        _hasRecording = true;
-        _recordedPath = path;
-      });
-    } catch (e) {
-      _showError('録音の停止に失敗しました');
-    }
-  }
-
-  // ========================================
-  // 再録音
-  // ========================================
-  void _retake() {
-    setState(() {
-      _hasRecording = false;
-      _recordedPath = null;
-      _recordSeconds = 0;
-    });
-  }
-
-  // ========================================
-  // 再生 / 停止
-  // ========================================
-  Future<void> _togglePlay() async {
-    if (_isPlaying) {
-      await _audioService.stopPlaying();
-      setState(() => _isPlaying = false);
-    } else {
-      setState(() => _isPlaying = true);
-      try {
-        await _audioService.playLocal(_recordedPath!);
-      } catch (_) {}
-      if (mounted) setState(() => _isPlaying = false);
-    }
-  }
-
-  // ========================================
-  // 送信
-  // ========================================
-  Future<void> _send() async {
-    if (_recordedPath == null) return;
-    setState(() => _isSending = true);
-    try {
-      await MessageService.sendMessage(
-        voiceFile: File(_recordedPath!),
-        receiverIds: widget.recipientIds,
-        duration: _recordSeconds > 0 ? _recordSeconds : null,
-        thumbnailFile: _thumbnailPath != null ? File(_thumbnailPath!) : null,
-      );
-      if (!mounted) return;
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSending = false);
-      // オフライン保存にフォールバックした場合（サーバー未接続など）
-      if (e.toString().startsWith('offline:')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.cloud_off, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Expanded(child: Text('サーバーに接続できませんでした。\nネットワーク復帰後に自動送信されます。')),
-              ],
-            ),
-            backgroundColor: Colors.orange.shade700,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-        // オフライン保存は成功なので画面を閉じる
-        Navigator.pop(context);
-        return;
+  void _onProviderChanged() {
+    if (mounted) {
+      setState(() {});
+      // エラーが発生した場合は SnackBar 表示
+      if (_provider.error != null) {
+        _showError(_provider.error!);
       }
-      _showError('送信エラー: $e');
     }
   }
 
+  @override
+  void dispose() {
+    _provider.removeListener(_onProviderChanged);
+    _provider.dispose();
+    _pulseController.dispose();
+    _waveController.dispose();
+    super.dispose();
+  }
+
   // ========================================
-  // サムネイル選択
+  // サムネイル選択（UI 操作のため Screen に残す）
   // ========================================
   Future<void> _pickImage() async {
     try {
@@ -221,26 +116,57 @@ class _RecordingScreenState extends State<RecordingScreen>
         imageQuality: 85,
       );
       if (image != null) {
-        setState(() => _thumbnailPath = image.path);
+        _provider.setThumbnailPath(image.path);
       }
     } catch (e) {
       _showError('画像選択エラー: $e');
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
-    );
+  // ========================================
+  // 送信（結果ハンドリングは Screen、ロジックは Provider）
+  // ========================================
+  Future<void> _send() async {
+    try {
+      await _provider.send(widget.recipientIds);
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      // オフライン保存にフォールバックした場合
+      if (e.toString().startsWith('offline:')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.cloud_off, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'サーバーに接続できませんでした。\nネットワーク復帰後に自動送信されます。',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade700,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        Navigator.pop(context);
+        return;
+      }
+      _showError('送信エラー: $e');
+    }
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _waveController.dispose();
-    _stopTimer();
-    _audioService.stopPlaying();
-    super.dispose();
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.red.shade700,
+      ),
+    );
   }
 
   // ========================================
@@ -337,12 +263,12 @@ class _RecordingScreenState extends State<RecordingScreen>
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
               child: Text(
-                _isRecording
+                _provider.isRecording
                     ? '録音中'
-                    : _hasRecording
+                    : _provider.hasRecording
                     ? '録音完了'
                     : '録音を開始',
-                key: ValueKey('$_isRecording$_hasRecording'),
+                key: ValueKey('${_provider.isRecording}${_provider.hasRecording}'),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -351,25 +277,26 @@ class _RecordingScreenState extends State<RecordingScreen>
                 ),
               ),
             ),
-
             const SizedBox(height: 24),
 
             // サムネイル（録音中以外で表示）
-            if (!_isRecording) _buildThumbnailPicker(),
-
-            if (!_isRecording) const SizedBox(height: 20),
+            if (!_provider.isRecording) _buildThumbnailPicker(),
+            if (!_provider.isRecording) const SizedBox(height: 20),
 
             // マイクボタン or 波形ビジュアル
-            if (!_hasRecording) _buildMicButton() else _buildWaveformDisplay(),
+            if (!_provider.hasRecording)
+              _buildMicButton()
+            else
+              _buildWaveformDisplay(),
 
             const SizedBox(height: 28),
 
             // タイマー
             AnimatedOpacity(
-              opacity: (_isRecording || _hasRecording) ? 1.0 : 0.0,
+              opacity: (_provider.isRecording || _provider.hasRecording) ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),
               child: Text(
-                _timerText,
+                _provider.timerText,
                 style: const TextStyle(
                   fontSize: 52,
                   fontWeight: FontWeight.w200,
@@ -379,7 +306,7 @@ class _RecordingScreenState extends State<RecordingScreen>
               ),
             ),
 
-            if (!_isRecording && !_hasRecording) ...[
+            if (!_provider.isRecording && !_provider.hasRecording) ...[
               const SizedBox(height: 52),
               Text(
                 'マイクをタップして録音開始',
@@ -399,6 +326,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   // サムネイルピッカー
   // ========================================
   Widget _buildThumbnailPicker() {
+    final thumbnailPath = _provider.thumbnailPath;
     return GestureDetector(
       onTap: _pickImage,
       child: AnimatedContainer(
@@ -409,12 +337,12 @@ class _RecordingScreenState extends State<RecordingScreen>
           color: Colors.white.withOpacity(0.12),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _thumbnailPath != null
+            color: thumbnailPath != null
                 ? Colors.purple.shade200
                 : Colors.white.withOpacity(0.3),
-            width: _thumbnailPath != null ? 2 : 1,
+            width: thumbnailPath != null ? 2 : 1,
           ),
-          boxShadow: _thumbnailPath != null
+          boxShadow: thumbnailPath != null
               ? [
                   BoxShadow(
                     color: Colors.purple.withOpacity(0.3),
@@ -426,14 +354,13 @@ class _RecordingScreenState extends State<RecordingScreen>
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(19),
-          child: _thumbnailPath != null
+          child: thumbnailPath != null
               ? Stack(
                   fit: StackFit.expand,
                   children: [
                     kIsWeb
-                        ? Image.network(_thumbnailPath!, fit: BoxFit.cover)
-                        : Image.file(File(_thumbnailPath!), fit: BoxFit.cover),
-                    // 変更ボタン
+                        ? Image.network(thumbnailPath, fit: BoxFit.cover)
+                        : Image.file(File(thumbnailPath), fit: BoxFit.cover),
                     Positioned(
                       bottom: 4,
                       right: 4,
@@ -476,11 +403,13 @@ class _RecordingScreenState extends State<RecordingScreen>
   }
 
   // ========================================
-  // マイクボタン
+  // マイクボタン（録音前）
   // ========================================
   Widget _buildMicButton() {
     return GestureDetector(
-      onTap: _isRecording ? _stopRecording : _startRecording,
+      onTap: _provider.isRecording
+          ? _provider.stopRecording
+          : _provider.startRecording,
       child: SizedBox(
         width: 200,
         height: 200,
@@ -488,7 +417,7 @@ class _RecordingScreenState extends State<RecordingScreen>
           alignment: Alignment.center,
           children: [
             // 同心円パルス（録音中のみ）
-            if (_isRecording)
+            if (_provider.isRecording)
               AnimatedBuilder(
                 animation: _pulseController,
                 builder: (_, __) {
@@ -496,40 +425,42 @@ class _RecordingScreenState extends State<RecordingScreen>
                     alignment: Alignment.center,
                     children: [
                       for (int i = 0; i < 3; i++)
-                        _buildPulseRing((_pulseController.value + i / 3) % 1.0),
+                        _buildPulseRing(
+                          (_pulseController.value + i / 3) % 1.0,
+                        ),
                     ],
                   );
                 },
               ),
-
             // メインボタン
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: _isRecording ? 88 : 80,
-              height: _isRecording ? 88 : 80,
+              width: _provider.isRecording ? 88 : 80,
+              height: _provider.isRecording ? 88 : 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: _isRecording
+                  colors: _provider.isRecording
                       ? [const Color(0xFFFF5252), const Color(0xFFD32F2F)]
                       : [const Color(0xFF9C6FFF), const Color(0xFF6C2FEF)],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        (_isRecording
-                                ? const Color(0xFFFF5252)
-                                : const Color(0xFF7C4DFF))
-                            .withOpacity(0.55),
+                    color: (_provider.isRecording
+                            ? const Color(0xFFFF5252)
+                            : const Color(0xFF7C4DFF))
+                        .withOpacity(0.55),
                     blurRadius: 32,
                     spreadRadius: 4,
                   ),
                 ],
               ),
               child: Icon(
-                _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                _provider.isRecording
+                    ? Icons.stop_rounded
+                    : Icons.mic_rounded,
                 color: Colors.white,
                 size: 40,
               ),
@@ -562,34 +493,9 @@ class _RecordingScreenState extends State<RecordingScreen>
   Widget _buildWaveformDisplay() {
     const barCount = 28;
     const barHeights = [
-      18.0,
-      28.0,
-      22.0,
-      38.0,
-      30.0,
-      50.0,
-      42.0,
-      60.0,
-      48.0,
-      55.0,
-      38.0,
-      62.0,
-      44.0,
-      58.0,
-      36.0,
-      50.0,
-      40.0,
-      56.0,
-      32.0,
-      46.0,
-      38.0,
-      28.0,
-      42.0,
-      30.0,
-      22.0,
-      34.0,
-      20.0,
-      16.0,
+      18.0, 28.0, 22.0, 38.0, 30.0, 50.0, 42.0, 60.0, 48.0, 55.0,
+      38.0, 62.0, 44.0, 58.0, 36.0, 50.0, 40.0, 56.0, 32.0, 46.0,
+      38.0, 28.0, 42.0, 30.0, 22.0, 34.0, 20.0, 16.0,
     ];
 
     return Container(
@@ -609,7 +515,7 @@ class _RecordingScreenState extends State<RecordingScreen>
           return AnimatedBuilder(
             animation: _waveController,
             builder: (_, __) {
-              final scale = _isPlaying
+              final scale = _provider.isPlaying
                   ? _waveAnimations[i % _waveAnimations.length].value
                   : 1.0;
               return Container(
@@ -646,7 +552,7 @@ class _RecordingScreenState extends State<RecordingScreen>
       padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
-        child: _hasRecording
+        child: _provider.hasRecording
             ? _buildPostRecordControls()
             : _buildPreRecordInfo(),
       ),
@@ -657,7 +563,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   // 録音前の情報パネル
   // ========================================
   Widget _buildPreRecordInfo() {
-    final config = RecordingConfig.fromQuality(_currentQuality);
+    final config = RecordingConfig.fromQuality(_provider.currentQuality);
     return Column(
       key: const ValueKey('pre'),
       mainAxisSize: MainAxisSize.min,
@@ -683,7 +589,11 @@ class _RecordingScreenState extends State<RecordingScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.graphic_eq, size: 16, color: Color(0xFF7C4DFF)),
+              const Icon(
+                Icons.graphic_eq,
+                size: 16,
+                color: Color(0xFF7C4DFF),
+              ),
               const SizedBox(width: 6),
               Text(
                 '録音品質: ${config.displayName}',
@@ -708,9 +618,9 @@ class _RecordingScreenState extends State<RecordingScreen>
       key: const ValueKey('post'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        // 再生ボタン（大）
+        // 再生ボタン
         GestureDetector(
-          onTap: _togglePlay,
+          onTap: _provider.togglePlay,
           child: Container(
             width: 72,
             height: 72,
@@ -730,7 +640,9 @@ class _RecordingScreenState extends State<RecordingScreen>
               ],
             ),
             child: Icon(
-              _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              _provider.isPlaying
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
               color: Colors.white,
               size: 38,
             ),
@@ -738,7 +650,7 @@ class _RecordingScreenState extends State<RecordingScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          _isPlaying ? '再生中...' : '確認再生',
+          _provider.isPlaying ? '再生中...' : '確認再生',
           style: TextStyle(fontSize: 12, color: Colors.grey[500]),
         ),
 
@@ -749,7 +661,7 @@ class _RecordingScreenState extends State<RecordingScreen>
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _isSending ? null : _retake,
+                onPressed: _provider.isSending ? null : _provider.retake,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('撮り直す'),
                 style: OutlinedButton.styleFrom(
@@ -766,8 +678,8 @@ class _RecordingScreenState extends State<RecordingScreen>
             Expanded(
               flex: 2,
               child: ElevatedButton.icon(
-                onPressed: _isSending ? null : _send,
-                icon: _isSending
+                onPressed: _provider.isSending ? null : _send,
+                icon: _provider.isSending
                     ? const SizedBox(
                         width: 18,
                         height: 18,
@@ -777,7 +689,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                         ),
                       )
                     : const Icon(Icons.send_rounded, size: 18),
-                label: Text(_isSending ? '送信中...' : '送信する'),
+                label: Text(_provider.isSending ? '送信中...' : '送信する'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF7C4DFF),
                   foregroundColor: Colors.white,
