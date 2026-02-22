@@ -8,11 +8,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'auth_service.dart';
 import 'offline_service.dart';
-import 'network_connectivity_service.dart';
 import 'package:voice_message_app/models/offline_model.dart';
 
 /// メッセージ情報を表すクラス
@@ -28,6 +28,7 @@ class MessageInfo {
   final int fileSize;
   final int? duration;
   final String mimeType;
+  final String? thumbnailUrl; // 添付画像 URL
   final DateTime sentAt;
   final bool isRead;
   final DateTime? readAt;
@@ -44,6 +45,7 @@ class MessageInfo {
     required this.fileSize,
     this.duration,
     required this.mimeType,
+    this.thumbnailUrl,
     required this.sentAt,
     required this.isRead,
     this.readAt,
@@ -51,6 +53,12 @@ class MessageInfo {
 
   /// JSONからMessageInfoオブジェクトを生成
   factory MessageInfo.fromJson(Map<String, dynamic> json) {
+    // attachedImage は 「uploads/timestamp-xxx.jpg」 なパスで返ってくる
+    // /voice/:filename エンドポイントで配信する
+    final rawAttached = json['attachedImage'] as String?;
+    final thumbnailUrl = rawAttached != null && rawAttached.isNotEmpty
+        ? '$BASE_URL/voice/${rawAttached.split('/').last}'
+        : null;
     return MessageInfo(
       id: json['_id'],
       senderId: json['sender']['_id'] ?? json['sender'],
@@ -63,6 +71,7 @@ class MessageInfo {
       fileSize: json['fileSize'] ?? 0,
       duration: json['duration'],
       mimeType: json['mimeType'] ?? 'audio/mpeg',
+      thumbnailUrl: thumbnailUrl,
       sentAt: DateTime.parse(json['sentAt']),
       isRead: json['isRead'] ?? false,
       readAt: json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
@@ -139,29 +148,19 @@ class MessageService {
     required File voiceFile,
     required List<String> receiverIds,
     int? duration,
+    File? thumbnailFile, // 添付画像（任意）
   }) async {
     final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('認証が必要です');
     }
 
-    final networkService = NetworkConnectivityService();
-
     // ========================================
-    // オフラインモード判定
+    // サーバーへ送信（失敗時はオフラインに自動フォールバック）
     // ========================================
-    if (!networkService.isOnline) {
-      // アプリがオフラインの場合、メッセージをローカルに保存
-      return _saveMessageOffline(
-        voiceFile: voiceFile,
-        receiverIds: receiverIds,
-        duration: duration,
-      );
-    }
-
-    // ========================================
-    // オンラインモード - サーバーに送信
-    // ========================================
+    // NOTE: connectivity_plus はエミュレーター等で誤って none を返すことがある。
+    //       isOnline の事前チェックは行わず、実際のHTTPリクエストを試みる。
+    //       SocketException / タイムアウト発生時に初めてオフライン保存へ切り替える。
     try {
       // MultipartRequestを作成
       var request = http.MultipartRequest(
@@ -172,10 +171,25 @@ class MessageService {
       // ヘッダーを設定
       request.headers['Authorization'] = 'Bearer $token';
 
-      // 音声ファイルを添付
+      // 音声ファイルを添付（MIMEタイプを明示: m4aはvideo/mp4と誤検知されるため）
       request.files.add(
-        await http.MultipartFile.fromPath('voice', voiceFile.path),
+        await http.MultipartFile.fromPath(
+          'voice',
+          voiceFile.path,
+          contentType: MediaType('audio', 'mp4'),
+        ),
       );
+
+      // サムネイル番像があれば添付
+      if (thumbnailFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'thumbnail',
+            thumbnailFile.path,
+            contentType: MediaType('image', 'jpeg'),
+          ),
+        );
+      }
 
       // 受信者IDリストをJSON文字列として送信
       request.fields['receivers'] = jsonEncode(receiverIds);
@@ -200,13 +214,15 @@ class MessageService {
         final data = jsonDecode(response.body);
         return data['messageId'];
       } else {
-        // 5xxエラーやネットワークエラーの場合、オフラインモードで保存
+        // 5xxエラー → サーバー側のエラー内容をログに出したうえでオフライン保存
         if (response.statusCode >= 500) {
-          return _saveMessageOffline(
+          print('🔴 サーバーエラー ${response.statusCode}: ${response.body}');
+          final id = await _saveMessageOffline(
             voiceFile: voiceFile,
             receiverIds: receiverIds,
             duration: duration,
           );
+          throw _OfflineSavedException(id);
         }
 
         // レスポンスがJSONでない場合（HTMLエラーページなど）に対応
@@ -222,13 +238,28 @@ class MessageService {
         }
       }
     } catch (e) {
-      // ネットワークエラーの場合、オフラインモードで保存
-      if (e is SocketException || e.toString().contains('タイムアウト')) {
-        return _saveMessageOffline(
+      // SocketException: サーバーに繋がらない場合
+      if (e is SocketException) {
+        print(
+          '🔴 SocketException: ${e.message} (adb reverse / バックエンド起動を確認してください)',
+        );
+        // オフライン保存してから例外を再スローすることで UI にもエラーを伝える
+        final id = await _saveMessageOffline(
           voiceFile: voiceFile,
           receiverIds: receiverIds,
           duration: duration,
         );
+        throw _OfflineSavedException(id);
+      }
+      // タイムアウト
+      if (e.toString().contains('タイムアウト')) {
+        print('⏱️  送信タイムアウト: オフライン保存にフォールバック');
+        final id = await _saveMessageOffline(
+          voiceFile: voiceFile,
+          receiverIds: receiverIds,
+          duration: duration,
+        );
+        throw _OfflineSavedException(id);
       }
       rethrow;
     }
@@ -251,9 +282,11 @@ class MessageService {
     final fileSize = fileStat.size;
 
     // 現在のユーザーIDを取得
-    final currentUserId = await AuthService.getMe().then(
-      (user) => user['_id'] ?? user['id'],
-    );
+    // getMe() は { "user": { "id": "...", ... } } を返す
+    final currentUserId = await AuthService.getMe().then((data) {
+      final user = data['user'] as Map<String, dynamic>?;
+      return (user?['id'] ?? user?['_id'])?.toString() ?? '';
+    });
 
     // オフラインメッセージオブジェクトを作成
     final offlineMessage = OfflineMessage(
@@ -323,70 +356,63 @@ class MessageService {
       throw Exception('認証が必要です');
     }
 
-    final networkService = NetworkConnectivityService();
     final offlineService = OfflineService();
 
+    // ========================================
+    // 常にサーバーから最新データ取得を試みる
+    // SocketException / タイムアウト時のみキャッシュにフォールバック
+    // NOTE: isOnline チェックは connectivity_plus の誤検知を避けるため使用しない
+    // ========================================
     try {
-      // ========================================
-      // オンラインモード - サーバーから最新データ取得
-      // ========================================
-      if (networkService.isOnline) {
-        final response = await http
-            .get(
-              Uri.parse('$BASE_URL/messages/received'),
-              headers: {'Authorization': 'Bearer $token'},
-            )
-            .timeout(
-              const Duration(seconds: 15),
-              onTimeout: () {
-                throw TimeoutException('リクエストタイムアウト');
-              },
-            );
-
-        if (response.statusCode == 200) {
-          final List<dynamic> data = jsonDecode(response.body);
-          final messages = data.map((json) {
-            return MessageInfo.fromJson(json);
-          }).toList();
-
-          // キャッシュに保存（後で使用するため）
-          _cacheReceivedMessages(messages);
-
-          return messages;
-        } else {
-          final error = jsonDecode(response.body);
-          throw Exception(error['error'] ?? '受信メッセージの取得に失敗しました');
-        }
-      } else {
-        // ========================================
-        // オフラインモード - キャッシュから取得
-        // ========================================
-        print('💾 オフラインモード: キャッシュからメッセージを読み込み中...');
-
-        final cachedMessages = await offlineService.getAllCachedMessages();
-
-        if (cachedMessages.isEmpty) {
-          print('⚠️  キャッシュされたメッセージがありません');
-          return [];
-        }
-
-        // CachedMessageInfo を MessageInfo に変換
-        return cachedMessages.map((cached) {
-          return MessageInfo(
-            id: cached.id,
-            senderId: cached.senderId,
-            senderUsername: cached.senderName,
-            senderProfileImage: cached.senderProfileImage,
-            filePath: cached.filePath,
-            fileSize: cached.fileSize,
-            duration: null,
-            mimeType: 'audio/mpeg',
-            sentAt: cached.sentAt,
-            isRead: cached.isRead,
-            readAt: cached.readAt,
+      final response = await http
+          .get(
+            Uri.parse('$BASE_URL/messages/received'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              throw TimeoutException('リクエストタイムアウト');
+            },
           );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final messages = data.map((json) {
+          return MessageInfo.fromJson(json);
         }).toList();
+
+        // キャッシュに保存（後で使用するため）
+        _cacheReceivedMessages(messages);
+
+        return messages;
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? '受信メッセージの取得に失敗しました');
       }
+    } on SocketException {
+      // ネットワーク未接続 → キャッシュから取得
+      print('💾 SocketException: キャッシュからメッセージを読み込み中...');
+      final cachedMessages = await offlineService.getAllCachedMessages();
+      if (cachedMessages.isEmpty) {
+        print('⚠️  キャッシュされたメッセージがありません');
+        return [];
+      }
+      return cachedMessages.map((cached) {
+        return MessageInfo(
+          id: cached.id,
+          senderId: cached.senderId,
+          senderUsername: cached.senderName,
+          senderProfileImage: cached.senderProfileImage,
+          filePath: cached.filePath,
+          fileSize: cached.fileSize,
+          duration: null,
+          mimeType: 'audio/mpeg',
+          sentAt: cached.sentAt,
+          isRead: cached.isRead,
+          readAt: cached.readAt,
+        );
+      }).toList();
     } on TimeoutException {
       // タイムアウト時はキャッシュから取得
       print('⏱️  タイムアウト: キャッシュからメッセージを読み込み中...');
@@ -732,4 +758,13 @@ class MessageService {
       throw Exception('通信エラーが発生しました。ネットワーク接続を確認してください。');
     }
   }
+}
+
+/// オフライン保存が行われたことを示す例外
+/// sendMessage がオフライン保存にフォールバックした際にスローされる
+class _OfflineSavedException implements Exception {
+  final String messageId;
+  _OfflineSavedException(this.messageId);
+  @override
+  String toString() => 'offline:$messageId';
 }

@@ -27,7 +27,9 @@ exports.sendMessage = async (req, res) => {
   try {
     const senderId = req.user.id;
     const { receivers, duration } = req.body; // receivers: JSON文字列 "[\"id1\", \"id2\"]"
-    const file = req.file;
+    // upload.fields() を使用するため req.files になる
+    const file = req.files?.voice?.[0];
+    const thumbnailFile = req.files?.thumbnail?.[0] || null;
 
     // ファイルの確認
     if (!file) {
@@ -82,6 +84,7 @@ exports.sendMessage = async (req, res) => {
       fileSize: file.size,
       duration: duration ? parseInt(duration) : null,
       mimeType: file.mimetype,
+      attachedImage: thumbnailFile ? thumbnailFile.path : null,
       readStatus: readStatus
     });
 
@@ -689,6 +692,7 @@ exports.getThreadMessages = async (req, res) => {
         fileSize: message.fileSize,
         duration: message.duration,
         mimeType: message.mimeType,
+        attachedImage: message.attachedImage || null,
         sentAt: message.sentAt,
         isRead,
         readAt

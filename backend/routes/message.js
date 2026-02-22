@@ -35,23 +35,23 @@ const storage = multer.diskStorage({
   }
 });
 
-// ファイルフィルター（音声ファイルのみ許可）
+// ファイルフィルター（音声 + 画像を許可）
 const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = [
-    'audio/mpeg',       // mp3
-    'audio/mp4',        // m4a
-    'audio/m4a',        // m4a (alternative)
-    'audio/x-m4a',      // m4a
-    'audio/aac',        // aac
-    'audio/wav',        // wav
-    'audio/webm',       // webm
-    'audio/ogg'         // ogg
+  const allowedAudio = [
+    'audio/mpeg', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
+    'audio/aac', 'audio/wav', 'audio/webm', 'audio/ogg',
+    'video/mp4',  // m4a が video/mp4 として検出される場合（Android）
+  ];
+  const allowedImage = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   ];
 
-  if (allowedMimeTypes.includes(file.mimetype)) {
+  if (file.fieldname === 'voice' && allowedAudio.includes(file.mimetype)) {
+    cb(null, true);
+  } else if (file.fieldname === 'thumbnail' && allowedImage.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('音声ファイルのみアップロード可能です'), false);
+    cb(new Error(`許可されていないファイル形式です: ${file.mimetype} (${file.fieldname})`), false);
   }
 };
 
@@ -67,9 +67,12 @@ const upload = multer({
 // すべてのルートは認証が必要
 // ========================================
 
-// メッセージ送信（ファイルアップロード付き）
+// メッセージ送信（音声 + サムネイル任意）
 // POST /messages/send
-router.post('/send', protect, upload.single('voice'), sendMessage);
+router.post('/send', protect, upload.fields([
+  { name: 'voice', maxCount: 1 },
+  { name: 'thumbnail', maxCount: 1 }
+]), sendMessage);
 
 // テキストメッセージ送信
 // POST /messages/send-text
