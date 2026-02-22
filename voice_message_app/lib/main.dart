@@ -53,60 +53,12 @@ import 'firebase_options.dart';
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
-void main() async {
-  // Flutter Widgetの初期化（async処理を使うために必要）
+void main() {
+  // Flutter Widgetの初期化のみ（同期処理・一瞬）
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    // Firebase初期化
-    // FlutterFire CLI使用時は options: DefaultFirebaseOptions.currentPlatform を追加
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print('✅ Firebase initialized');
-
-    // FCMサービス初期化（通知受信設定）
-    await FcmService.initialize();
-  } catch (e) {
-    print('❌ Firebase initialization error: $e');
-    print('⚠️  Push notifications will not work');
-    print('⚠️  Run: cd voice_message_app && flutterfire configure');
-  }
-
-  // ========================================
-  // オフラインモード初期化
-  // ========================================
-  try {
-    // HiveデータベースとOfflineServiceを初期化
-    await OfflineService.initialize();
-    print('✅ Offline Service initialized');
-
-    // ネットワーク接続状態監視を開始
-    final networkService = NetworkConnectivityService();
-    await networkService.initialize();
-    print('✅ Network Connectivity Service initialized');
-    print('📡 Current status: ${networkService.getStatusText()}');
-
-    // 同期サービスを初期化
-    // NOTE: SyncServiceの完全な初期化はMessageServiceが必要なため、
-    //       main.dartではなく、認証後にAuthProviderで実行
-    print('✅ Sync Service initialized');
-  } catch (e) {
-    print('❌ Offline Service initialization error: $e');
-    print('⚠️  Offline mode will not work');
-  }
-
-  // ========================================
-  // テーマプロバイダー初期化
-  // ========================================
-  try {
-    final themeProvider = ThemeProvider();
-    await themeProvider.initialize();
-    print('✅ Theme Provider initialized');
-  } catch (e) {
-    print('❌ Theme Provider initialization error: $e');
-  }
-
+  // 即座にアプリを起動してスプラッシュ画面を表示
+  // 全初期化はSplashScreen内でバックグラウンド実行
   runApp(const MyApp());
 }
 
@@ -130,47 +82,24 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ① MultiProvider で複数のProviderを登録
     return MultiProvider(
       providers: [
-        // テーマプロバイダー
-        // ChangeNotifierProvider(create: (_) => ThemeProvider()),
-
-        // 認証状態を管理するProvider
-        // AuthProvider()が初期化される
-        // 全子ウィジェット（全画面）から Consumer<AuthProvider> でアクセス可能
         ChangeNotifierProvider(create: (_) => AuthProvider()),
-
-        // テーマ設定を管理するProvider
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-
-        // ネットワーク接続状態を管理するProvider
-        // NetworkConnectivityService が初期化される
-        // リアルタイムにオンライン/オフライン状態を監視
         ChangeNotifierProvider(create: (_) => NetworkConnectivityService()),
-
-        // 同期処理を管理するProvider
-        // SyncService が初期化される
-        // オフラインメッセージの同期を管理
         ChangeNotifierProvider(create: (_) => SyncService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
-            title: 'ボイスメッセージアプリ', // アプリのタイトル（日本語）
-            // グローバルNavigatorKey（FCMなどウィジェット外からの遷移に使用）
+            title: 'ボイスメッセージアプリ',
             navigatorKey: NavigationService.navigatorKey,
-            // ② テーマ設定（ダークモード対応）
             theme: lightTheme(),
             darkTheme: darkTheme(),
             themeMode: themeProvider.isDarkMode
                 ? ThemeMode.dark
                 : ThemeMode.light,
-            // ③ 起動時に表示する画面 → AuthWrapper
-            // AuthWrapperが認証状態を確認して適切な画面を表示
-            home: const AuthWrapper(),
-            // ④ 名前付きルート（画面遷移時に使用）
-            // Navigator.pushNamed('/login') のような形式で遷移可能
+            home: const SplashScreen(),
             routes: {
               '/login': (context) => const LoginScreen(),
               '/register': (context) => const RegisterScreen(),
@@ -184,44 +113,107 @@ class MyApp extends StatelessWidget {
 }
 
 // ========================================
+// SplashScreen - 起動画面 & 初期化
+// ========================================
+/// 起動直後に表示し、バックグラウンドで全サービスを初期化する。
+/// 初期化が完了したらAuthWrapperへ遷移。
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // OfflineService(Hive) と Firebase を並列で初期化
+    // 両方バックグラウンドで実行し、完了を待たずに遷移
+    OfflineService.initialize().catchError((e) {
+      print('❌ Offline Service error: $e');
+    });
+
+    Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).then((_) => FcmService.initialize()).catchError((e) {
+      print('❌ Firebase error: $e');
+    });
+
+    // ThemeProvider・Network は軽量なので await
+    if (mounted) {
+      context.read<ThemeProvider>().initialize();
+      context.read<NetworkConnectivityService>().initialize();
+    }
+
+    // 少し待って（スプラッシュを見せる最低限の時間）AuthWrapperへ
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const AuthWrapper()));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // アプリのテーマカラーをそのまま使ったシンプルなスプラッシュ
+    return Scaffold(
+      backgroundColor: const Color(0xFF7C4DFF),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.mic, size: 72, color: Colors.white),
+            const SizedBox(height: 16),
+            const Text(
+              'ボイスメッセージ',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 48),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ========================================
 // AuthWrapper - 認証状態に応じた画面切り替え
 // ========================================
-/// 【役割】
-/// AuthProvider の認証状態を監視して、
-/// ログイン済み → ホーム画面
-/// 未ログイン → ログイン画面
-/// 初期化中 → ローディング画面
-/// を表示する
-///
-/// 【継承】
-/// StatelessWidget: 認証状態の管理はAuthProvider任せ
-///
-/// 【Consumer<AuthProvider>】
-/// - AuthProvider の変更を監視
-/// - authProvider.isAuthenticated が変わると rebuild
-/// - notifyListeners()で画面が自動更新される
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // ① AuthProvider を監視
     return Consumer<AuthProvider>(
       builder: (context, authProvider, _) {
-        // ② 初期化中（起動時のトークン確認中のみ）
-        // isLoading（ログイン操作中）では切り替えない → LoginScreenがアンマウントされるのを防ぐ
         if (authProvider.isInitializing) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
-
-        // ③ ログイン状態確認
         if (authProvider.isAuthenticated) {
-          // ③-1 ログイン済み → ホーム画面表示
           return const HomePage();
         } else {
-          // ③-2 未ログイン → ログイン画面表示
           return const LoginScreen();
         }
       },

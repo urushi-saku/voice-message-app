@@ -200,8 +200,6 @@ class MessageService {
         final data = jsonDecode(response.body);
         return data['messageId'];
       } else {
-        final error = jsonDecode(response.body);
-
         // 5xxエラーやネットワークエラーの場合、オフラインモードで保存
         if (response.statusCode >= 500) {
           return _saveMessageOffline(
@@ -211,7 +209,17 @@ class MessageService {
           );
         }
 
-        throw Exception(error['error'] ?? 'メッセージの送信に失敗しました');
+        // レスポンスがJSONでない場合（HTMLエラーページなど）に対応
+        try {
+          final error = jsonDecode(response.body);
+          throw Exception(
+            error['error'] ?? 'メッセージの送信に失敗しました (${response.statusCode})',
+          );
+        } on FormatException {
+          throw Exception(
+            'サーバーエラー (${response.statusCode}): バックエンドのURLを確認してください',
+          );
+        }
       }
     } catch (e) {
       // ネットワークエラーの場合、オフラインモードで保存

@@ -19,7 +19,18 @@ class RecordingScreen extends StatefulWidget {
   /// 送信先のユーザーIDリスト
   final List<String> recipientIds;
 
-  const RecordingScreen({super.key, required this.recipientIds});
+  /// 送信先のユーザー名（AppBar表示用）
+  final String? recipientUsername;
+
+  /// 送信先のプロフィール画像URL（AppBar表示用）
+  final String? recipientProfileImage;
+
+  const RecordingScreen({
+    super.key,
+    required this.recipientIds,
+    this.recipientUsername,
+    this.recipientProfileImage,
+  });
 
   @override
   State<RecordingScreen> createState() => _RecordingScreenState();
@@ -203,8 +214,7 @@ class _RecordingScreenState extends State<RecordingScreen> {
         ),
       );
 
-      // 前の画面に戻る（2つ戻る：録音画面→選択画面→フォロワー一覧）
-      Navigator.pop(context);
+      // 前の画面に戻る
       Navigator.pop(context);
     } catch (e) {
       setState(() {
@@ -223,9 +233,57 @@ class _RecordingScreenState extends State<RecordingScreen> {
   Widget build(BuildContext context) {
     final config = RecordingConfig.fromQuality(_currentQuality);
 
+    final recipientName = widget.recipientUsername ?? '送信先';
+    final recipientImage = widget.recipientProfileImage;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ボイスメッセージを録音'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: Colors.white.withOpacity(0.3),
+              backgroundImage: recipientImage != null
+                  ? NetworkImage(recipientImage)
+                  : null,
+              child: recipientImage == null
+                  ? Text(
+                      recipientName.isNotEmpty
+                          ? recipientName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                recipientName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
         actions: [
           // 現在の録音品質を表示
           Center(
@@ -235,12 +293,16 @@ class _RecordingScreenState extends State<RecordingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text('録音品質', style: TextStyle(fontSize: 10)),
+                  const Text(
+                    '録音品質',
+                    style: TextStyle(fontSize: 10, color: Colors.white70),
+                  ),
                   Text(
                     config.displayName,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -254,35 +316,6 @@ class _RecordingScreenState extends State<RecordingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ========================================
-            // 送信先の表示
-            // ========================================
-            Card(
-              color: Colors.blue[50],
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '送信先',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${widget.recipientIds.length}人のフォロワー',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
             // ========================================
             // サムネイル選択・表示
             // ========================================

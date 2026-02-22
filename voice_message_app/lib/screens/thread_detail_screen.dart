@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import '../services/message_service.dart';
 import 'recording_screen.dart';
 import 'voice_playback_screen.dart';
-import 'package:timeago/timeago.dart' as timeago;
 
 /// スレッド詳細画面（チャット形式）
 class ThreadDetailScreen extends StatefulWidget {
@@ -42,7 +41,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   @override
   void initState() {
     super.initState();
-    timeago.setLocaleMessages('ja', timeago.JaMessages());
     _displayName = widget.senderUsername;
     _displayProfileImage = widget.senderProfileImage;
     _loadMessages();
@@ -177,7 +175,11 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RecordingScreen(recipientIds: [widget.senderId]),
+        builder: (_) => RecordingScreen(
+          recipientIds: [widget.senderId],
+          recipientUsername: _displayName,
+          recipientProfileImage: _displayProfileImage,
+        ),
       ),
     ).then((_) => _loadMessages());
   }
@@ -185,97 +187,161 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   // ========================================
   // チャットバブル構築
   // ========================================
-  Widget _buildBubble(MessageInfo message) {
+  Widget _buildBubble(MessageInfo message, int index) {
     final isMe = message.isMine;
+    // 4件ごとのグループ先頭（index=0,4,8...）にアイコンを表示
+    final showAvatar = !isMe && index % 4 == 0;
+    // 送受信両方ともグループ先頭にしっぽを表示
+    final showTail = index % 4 == 0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: EdgeInsets.fromLTRB(12, showTail ? 10 : 2, 12, 2),
       child: Row(
         mainAxisAlignment: isMe
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.deepPurple,
-              backgroundImage: _displayProfileImage != null
-                  ? NetworkImage(_displayProfileImage!)
-                  : null,
-              child: _displayProfileImage == null
-                  ? Text(
-                      _displayName.isNotEmpty
-                          ? _displayName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isMe
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.65,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isMe ? Colors.deepPurple : Colors.grey.shade200,
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16),
-                      topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(isMe ? 16 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 16),
-                    ),
-                  ),
-                  padding: message.messageType == 'text'
-                      ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
-                      : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: message.messageType == 'text'
-                      ? Text(
-                          message.textContent ?? '',
-                          style: TextStyle(
-                            color: isMe ? Colors.white : Colors.black87,
-                            fontSize: 15,
-                          ),
-                        )
-                      : _buildVoiceBubble(message, isMe),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: isMe
-                      ? MainAxisAlignment.end
-                      : MainAxisAlignment.start,
-                  children: [
-                    // 既読表示（自分の送信メッセージのみ）
-                    if (isMe && message.isRead) ...
-                      [
-                        Text(
-                          '既読',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.deepPurple[300],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                      ],
-                    Text(
-                      timeago.format(message.sentAt, locale: 'ja'),
-                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            if (showAvatar)
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.deepPurple.withOpacity(0.3),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: const Color(0xFF7C4DFF),
+                  backgroundImage: _displayProfileImage != null
+                      ? NetworkImage(_displayProfileImage!)
+                      : null,
+                  child: _displayProfileImage == null
+                      ? Text(
+                          _displayName.isNotEmpty
+                              ? _displayName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                ),
+              )
+            else
+              const SizedBox(width: 36), // アイコン非表示時のインデント補完
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Row(
+              mainAxisAlignment: isMe
+                  ? MainAxisAlignment.end
+                  : MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // 自分のメッセージ：タイムスタンプ＋既読をバブルの左に
+                if (isMe) ...[
+                  _buildTimestamp(message, isMe),
+                  const SizedBox(width: 6),
+                ],
+                IntrinsicWidth(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.65,
+                        ),
+                        decoration: isMe
+                            ? BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFF7C4DFF),
+                                    Color(0xFF512DA8),
+                                  ],
+                                ),
+                                borderRadius: showTail
+                                    ? const BorderRadius.only(
+                                        topLeft: Radius.circular(16),
+                                        topRight: Radius.zero,
+                                        bottomLeft: Radius.circular(16),
+                                        bottomRight: Radius.circular(16),
+                                      )
+                                    : BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.deepPurple.withOpacity(0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              )
+                            : BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: showTail
+                                    ? const BorderRadius.only(
+                                        topLeft: Radius.zero,
+                                        topRight: Radius.circular(16),
+                                        bottomLeft: Radius.circular(16),
+                                        bottomRight: Radius.circular(16),
+                                      )
+                                    : BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.07),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: message.messageType == 'text'
+                              ? Text(
+                                  message.textContent ?? '',
+                                  style: TextStyle(
+                                    color: isMe ? Colors.white : Colors.black87,
+                                    fontSize: 15,
+                                    height: 1.4,
+                                  ),
+                                )
+                              : _buildVoiceBubble(message, isMe),
+                        ),
+                      ),
+                      // 吹き出しのしっぽ（グループ先頭のみ・上側）
+                      if (showTail)
+                        Positioned(
+                          top: 0,
+                          left: isMe ? null : -10,
+                          right: isMe ? -10 : null,
+                          child: CustomPaint(
+                            size: const Size(10, 10),
+                            painter: _TailPainter(
+                              isMe: isMe,
+                              color: isMe
+                                  ? const Color(0xFF7C4DFF)
+                                  : Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // 相手のメッセージ：タイムスタンプをバブルの右に
+                if (!isMe) ...[
+                  const SizedBox(width: 6),
+                  _buildTimestamp(message, isMe),
+                ],
               ],
             ),
           ),
@@ -285,67 +351,115 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     );
   }
 
-  Widget _buildVoiceBubble(MessageInfo message, bool isMe) {
-    return Row(
+  Widget _buildTimestamp(MessageInfo message, bool isMe) {
+    final time =
+        '${message.sentAt.hour.toString().padLeft(2, '0')}:${message.sentAt.minute.toString().padLeft(2, '0')}';
+    return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: isMe
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
-        Icon(
-          message.isRead ? Icons.volume_up : Icons.volume_off,
-          color: isMe ? Colors.white70 : Colors.deepPurple,
-          size: 22,
-        ),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ボイスメッセージ',
-                style: TextStyle(
-                  color: isMe ? Colors.white : Colors.black87,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              if (message.duration != null)
-                Text(
-                  '${message.duration}秒',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isMe ? Colors.white60 : Colors.grey[600],
+        if (isMe && message.isRead)
+          Text(
+            '既読',
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.deepPurple.shade300,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        Text(time, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+      ],
+    );
+  }
+
+  Widget _buildVoiceBubble(MessageInfo message, bool isMe) {
+    const barHeights = [
+      10.0,
+      18.0,
+      14.0,
+      22.0,
+      16.0,
+      20.0,
+      12.0,
+      18.0,
+      24.0,
+      14.0,
+      18.0,
+      10.0,
+    ];
+    final barColor = isMe
+        ? Colors.white.withOpacity(0.9)
+        : const Color(0xFF7C4DFF);
+    final inactiveColor = isMe
+        ? Colors.white.withOpacity(0.35)
+        : Colors.grey.shade300;
+
+    return GestureDetector(
+      onTap: () => _openPlayback(message),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 再生ボタン
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isMe
+                  ? Colors.white.withOpacity(0.2)
+                  : const Color(0xFF7C4DFF).withOpacity(0.12),
+            ),
+            child: Icon(
+              Icons.play_arrow_rounded,
+              color: isMe ? Colors.white : const Color(0xFF7C4DFF),
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 波形バー
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: List.generate(barHeights.length, (i) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                child: Container(
+                  width: 3,
+                  height: barHeights[i],
+                  decoration: BoxDecoration(
+                    color: i < 5 ? barColor : inactiveColor,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-            ],
+              );
+            }),
           ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () => _openPlayback(message),
-          child: Icon(
-            Icons.play_circle_filled,
-            color: isMe ? Colors.white : Colors.deepPurple,
-            size: 36,
-          ),
-        ),
-        if (!message.isRead && !isMe) ...[
-          const SizedBox(width: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'NEW',
+          const SizedBox(width: 8),
+          // 再生時間
+          if (message.duration != null)
+            Text(
+              '${message.duration}s',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: isMe ? Colors.white70 : Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
+          // 未読ドット
+          if (!message.isRead && !isMe) ...[
+            const SizedBox(width: 6),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFF5252),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -358,12 +472,25 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         return true;
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFFF0F2F5),
         appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+              ),
+            ),
+          ),
+          foregroundColor: Colors.white,
           title: Row(
             children: [
               CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white,
+                radius: 20,
+                backgroundColor: Colors.white.withOpacity(0.3),
                 backgroundImage: _displayProfileImage != null
                     ? NetworkImage(_displayProfileImage!)
                     : null,
@@ -373,7 +500,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                             ? _displayName[0].toUpperCase()
                             : '?',
                         style: const TextStyle(
-                          color: Colors.deepPurple,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       )
@@ -381,7 +508,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(_displayName, overflow: TextOverflow.ellipsis),
+                child: Text(
+                  _displayName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -413,7 +548,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                               controller: _scrollController,
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               itemCount: _messages.length,
-                              itemBuilder: (_, i) => _buildBubble(_messages[i]),
+                              itemBuilder: (_, i) =>
+                                  _buildBubble(_messages[i], i),
                             ),
                     ),
                   ),
@@ -429,70 +565,131 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   // ========================================
   Widget _buildInputArea() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade300)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            IconButton(
-              icon: const Icon(Icons.mic, color: Colors.deepPurple),
-              tooltip: 'ボイスメッセージ',
-              onPressed: _openRecording,
-            ),
-            Expanded(
-              child: TextField(
-                controller: _textController,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: 'メッセージを入力',
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: const BorderSide(
-                      color: Colors.deepPurple,
-                      width: 1.5,
-                    ),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
+            // マイクボタン（丸型）
+            Material(
+              color: const Color(0xFFEDE7F6),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _openRecording,
+                child: const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Icon(Icons.mic, color: Color(0xFF7C4DFF), size: 22),
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
+            // テキスト入力フィールド
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: TextField(
+                  controller: _textController,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.newline,
+                  decoration: const InputDecoration(
+                    hintText: 'メッセージを入力',
+                    hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    border: InputBorder.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 送信ボタン（グラデーション丸型）
             _isSending
                 ? const SizedBox(
-                    width: 40,
-                    height: 40,
+                    width: 42,
+                    height: 42,
                     child: Padding(
                       padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF7C4DFF),
+                      ),
                     ),
                   )
-                : IconButton(
-                    icon: const Icon(Icons.send, color: Colors.deepPurple),
-                    onPressed: _sendText,
-                    tooltip: '送信',
+                : GestureDetector(
+                    onTap: _sendText,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
                   ),
           ],
         ),
       ),
     );
   }
+}
+
+/// 吹き出しのしっぽを描画するCustomPainter
+class _TailPainter extends CustomPainter {
+  final bool isMe;
+  final Color color;
+
+  const _TailPainter({required this.isMe, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    if (isMe) {
+      // 右上に伸びる（自分のメッセージ）: 右角が先端
+      path.moveTo(0, 0); // 左上（バブル右上角に接続）
+      path.lineTo(0, size.height); // 左下
+      path.lineTo(size.width, 0); // 右上（先端）
+    } else {
+      // 左上に伸びる（相手のメッセージ）: 左角が先端
+      path.moveTo(size.width, 0); // 右上（バブル左上角に接続）
+      path.lineTo(size.width, size.height); // 右下
+      path.lineTo(0, 0); // 左上（先端）
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_TailPainter old) =>
+      old.isMe != isMe || old.color != color;
 }

@@ -51,16 +51,17 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ error: '受信者を少なくとも1人選択してください' });
     }
 
-    // 受信者が全員自分のフォロワーか確認
+    // 送信者が受信者全員をフォローしているか確認
+    // （自分がフォローしている人にのみ送信可能）
     for (const receiverId of receiverIds) {
-      const isFollower = await Follower.findOne({
-        user: senderId,
-        follower: receiverId
+      const isFollowing = await Follower.findOne({
+        user: receiverId,
+        follower: senderId
       });
 
-      if (!isFollower) {
+      if (!isFollowing) {
         return res.status(403).json({ 
-          error: 'フォロワーにしか送信できません' 
+          error: 'フォローしているユーザーにしか送信できません' 
         });
       }
     }
@@ -86,21 +87,21 @@ exports.sendMessage = async (req, res) => {
 
     await newMessage.save();
 
-    // 【プッシュ通知送信】
-    // 送信者情報を取得
-    const sender = await User.findById(senderId).select('username');
-    
-    // 受信者のFCMトークンを取得（変数名を receiversData に変更）
-    const receiversData = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
-    const fcmTokens = receiversData
-      .map(receiver => receiver.fcmToken)
-      .filter(token => token); // nullを除外
+    // レスポンスをすぐに返す（通知を待たない）
+    res.status(201).json({
+      message: 'メッセージを送信しました',
+      messageId: newMessage._id
+    });
 
-    // プッシュ通知を送信
-    if (fcmTokens.length > 0) {
-      try {
+    // プッシュ通知はバックグラウンドで非同期送信（レスポンス後に実行）
+    User.findById(senderId).select('username').then(sender => {
+      return User.find({ _id: { $in: receiverIds } }).select('fcmToken').then(receiversData => {
+        const fcmTokens = receiversData
+          .map(receiver => receiver.fcmToken)
+          .filter(token => token);
+        if (fcmTokens.length === 0) return;
         const durationText = duration ? `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}` : '';
-        await sendPushNotificationToMultiple(
+        return sendPushNotificationToMultiple(
           fcmTokens,
           {
             title: `${sender.username}から新しいメッセージ`,
@@ -113,15 +114,9 @@ exports.sendMessage = async (req, res) => {
             type: 'new_message',
           }
         );
-      } catch (notificationError) {
-        // 通知送信エラーでもメッセージ送信は成功とする
-        console.error('プッシュ通知送信エラー:', notificationError);
-      }
-    }
-
-    res.status(201).json({
-      message: 'メッセージを送信しました',
-      messageId: newMessage._id
+      });
+    }).catch(notificationError => {
+      console.error('プッシュ通知送信エラー:', notificationError);
     });
   } catch (error) {
     console.error('メッセージ送信エラー:', error);
@@ -172,28 +167,27 @@ exports.sendTextMessage = async (req, res) => {
 
     await newMessage.save();
 
-    // プッシュ通知
+    // レスポンスをすぐに返す（通知を待たない）
+    res.status(201).json({ message: 'テキストメッセージを送信しました', messageId: newMessage._id });
+
+    // プッシュ通知はバックグラウンドで非同期送信
     const sender = await User.findById(senderId).select('username');
     const receiversData = await User.find({ _id: { $in: receiverIds } }).select('fcmToken');
     const fcmTokens = receiversData.map(r => r.fcmToken).filter(Boolean);
     if (fcmTokens.length > 0) {
-      try {
-        await sendPushNotificationToMultiple(
-          fcmTokens,
-          {
-            title: `${sender.username}から新しいメッセージ`,
-            body: textContent.trim().length > 50
-                ? textContent.trim().slice(0, 50) + '...'
-                : textContent.trim(),
-          },
-          { messageId: newMessage._id.toString(), senderId, type: 'new_message' }
-        );
-      } catch (e) {
+      sendPushNotificationToMultiple(
+        fcmTokens,
+        {
+          title: `${sender.username}から新しいメッセージ`,
+          body: textContent.trim().length > 50
+              ? textContent.trim().slice(0, 50) + '...'
+              : textContent.trim(),
+        },
+        { messageId: newMessage._id.toString(), senderId, type: 'new_message' }
+      ).catch(e => {
         console.error('プッシュ通知送信エラー:', e);
-      }
+      });
     }
-
-    res.status(201).json({ message: 'テキストメッセージを送信しました', messageId: newMessage._id });
   } catch (error) {
     console.error('テキストメッセージ送信エラー:', error);
     res.status(500).json({ error: 'テキストメッセージの送信に失敗しました' });

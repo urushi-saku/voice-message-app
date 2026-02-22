@@ -155,11 +155,14 @@ class AuthProvider extends ChangeNotifier {
         _token = token;
         _isAuthenticated = true;
 
-        // ユーザー情報を取得
-        await _fetchUserInfo();
+        // トークンがある時点で即座に初期化完了 → 画面を表示
+        _isInitializing = false;
+        notifyListeners();
 
-        // FCMトークンをサーバーに登録（再起動時も最新トークンを保存）
+        // ユーザー情報・FCMトークン登録はバックグラウンドで実行（UIをブロックしない）
+        _fetchUserInfo().then((_) => notifyListeners());
         FcmService.sendTokenAfterLogin();
+        return;
       }
     } catch (e) {
       _isAuthenticated = false;

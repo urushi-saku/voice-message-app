@@ -20,6 +20,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'fcm_service.dart';
 
 /// 認証APIの基本URL（バックエンド）
+/// adb reverse tcp:3000 tcp:3000 を実行することで
+/// 実機・エミュレータ両方で localhost:3000 が使える
 const String BASE_URL = 'http://localhost:3000';
 
 /// 認証サービスクラス

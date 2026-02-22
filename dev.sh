@@ -25,6 +25,10 @@ adb_reverse_watcher() {
 adb_reverse_watcher &
 WATCHER_PID=$!
 
+# 既に接続済みのデバイスにも即時適用
+echo "[adb] 接続済みデバイスに adb reverse を適用..."
+$ADB reverse tcp:3000 tcp:3000 2>/dev/null && echo "[adb] ✓ adb reverse 完了" || echo "[adb] デバイス未接続（watcher が接続待機中）"
+
 # バックエンド起動（バックグラウンド）
 echo "[backend] バックエンドサーバーを起動中..."
 cd "$BACKEND_DIR" && npm start &

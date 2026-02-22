@@ -40,7 +40,9 @@ const fileFilter = (req, file, cb) => {
   const allowedMimeTypes = [
     'audio/mpeg',       // mp3
     'audio/mp4',        // m4a
+    'audio/m4a',        // m4a (alternative)
     'audio/x-m4a',      // m4a
+    'audio/aac',        // aac
     'audio/wav',        // wav
     'audio/webm',       // webm
     'audio/ogg'         // ogg

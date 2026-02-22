@@ -197,8 +197,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          RecordingScreen(recipientIds: [widget.user.id]),
+                      builder: (_) => RecordingScreen(
+                        recipientIds: [widget.user.id],
+                        recipientUsername: widget.user.username,
+                        recipientProfileImage: widget.user.profileImage,
+                      ),
                     ),
                   ),
                   icon: const Icon(Icons.mic, color: Colors.deepPurple),
