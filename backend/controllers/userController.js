@@ -448,3 +448,43 @@ exports.updateProfileImage = async (req, res) => {
     res.status(500).json({ error: 'プロフィール画像の更新に失敗しました' });
   }
 };
+
+// ========================================
+// E2EE 公開鍵を登録 / 更新
+// PUT /users/public-key
+// ========================================
+// クライアントで生成した X25519 公開鍵（Base64）をサーバーに保存する
+// 秘密鍵はデバイスのSecureStorageにのみ保管し、サーバーには送らない
+exports.updatePublicKey = async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    if (!publicKey) {
+      return res.status(400).json({ error: '公開鍵が指定されていません' });
+    }
+
+    await User.findByIdAndUpdate(req.user.id, { publicKey });
+
+    res.json({ message: '公開鍵を更新しました' });
+  } catch (error) {
+    console.error('公開鍵更新エラー:', error);
+    res.status(500).json({ error: '公開鍵の更新に失敗しました' });
+  }
+};
+
+// ========================================
+// ユーザーの公開鍵を取得
+// GET /users/:id/public-key
+// ========================================
+// メッセージ送信前に受信者の公開鍵を取得するために使用
+exports.getPublicKey = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('publicKey');
+    if (!user) {
+      return res.status(404).json({ error: 'ユーザーが見つかりません' });
+    }
+    res.json({ publicKey: user.publicKey });
+  } catch (error) {
+    console.error('公開鍵取得エラー:', error);
+    res.status(500).json({ error: '公開鍵の取得に失敗しました' });
+  }
+};

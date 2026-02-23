@@ -9,11 +9,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'auth_service.dart';
+import 'e2ee_service.dart';
 import 'offline_service.dart';
 import 'package:voice_message_app/models/offline_model.dart';
 import 'package:voice_message_app/models/message.dart';
@@ -45,32 +47,76 @@ class MessageService {
       throw Exception('認証が必要です');
     }
 
+    // =====================================
+    // E2EE 暗号化（受信者全員が公開鍵登録済みの場合）
+    // =====================================
+    File uploadFile = voiceFile;
+    String? e2eeContentNonce;
+    String? e2eeEncryptedKeysJson;
+
+    try {
+      final myUserId = await AuthService.getCurrentUserId();
+      if (myUserId != null) {
+        // 全受信者の公開鍵を並列取得（自分も含む）
+        final allIds = [...receiverIds, myUserId];
+        final pkResults = await Future.wait(
+          allIds.map((id) => E2eeService.fetchPublicKey(id)),
+        );
+
+        if (pkResults.every((pk) => pk != null)) {
+          final receivers = allIds.asMap().entries.map((e) {
+            return ReceiverKey(
+              userId: allIds[e.key],
+              publicKey: pkResults[e.key]!,
+            );
+          }).toList();
+
+          // 音声バイト列を暗号化
+          final audioBytes = await voiceFile.readAsBytes();
+          final payload = await E2eeService.encryptForReceivers(
+            audioBytes,
+            receivers,
+          );
+
+          // 暗号化済みバイト列を一時ファイルに保存
+          final tempDir = await getTemporaryDirectory();
+          final encFile = File(
+            '${tempDir.path}/enc_${DateTime.now().millisecondsSinceEpoch}.m4a',
+          );
+          await encFile.writeAsBytes(base64Decode(payload.encryptedContent));
+          uploadFile = encFile;
+
+          e2eeContentNonce = payload.contentNonce;
+          e2eeEncryptedKeysJson = jsonEncode(
+            payload.encryptedKeys.map((k) => k.toJson()).toList(),
+          );
+        }
+      }
+    } catch (e) {
+      // E2EE 失敗時は暗号化なしでの送信にフォールバック
+      print('[E2EE] 暗号化スキップ: $e');
+    }
+
     // ========================================
     // サーバーへ送信（失敗時はオフラインに自動フォールバック）
     // ========================================
-    // NOTE: connectivity_plus はエミュレーター等で誤って none を返すことがある。
-    //       isOnline の事前チェックは行わず、実際のHTTPリクエストを試みる。
-    //       SocketException / タイムアウト発生時に初めてオフライン保存へ切り替える。
     try {
-      // MultipartRequestを作成
       var request = http.MultipartRequest(
         'POST',
         Uri.parse('$BASE_URL/messages/send'),
       );
 
-      // ヘッダーを設定
       request.headers['Authorization'] = 'Bearer $token';
 
-      // 音声ファイルを添付（MIMEタイプを明示: m4aはvideo/mp4と誤検知されるため）
+      // 音声ファイルを添付します（E2EE が有効な場合は暗号化済み）
       request.files.add(
         await http.MultipartFile.fromPath(
           'voice',
-          voiceFile.path,
+          uploadFile.path,
           contentType: MediaType('audio', 'mp4'),
         ),
       );
 
-      // サムネイル番像があれば添付
       if (thumbnailFile != null) {
         request.files.add(
           await http.MultipartFile.fromPath(
@@ -81,12 +127,17 @@ class MessageService {
         );
       }
 
-      // 受信者IDリストをJSON文字列として送信
       request.fields['receivers'] = jsonEncode(receiverIds);
 
-      // 録音時間がある場合は送信
       if (duration != null) {
         request.fields['duration'] = duration.toString();
+      }
+
+      // E2EE メタデータを添付
+      if (e2eeContentNonce != null && e2eeEncryptedKeysJson != null) {
+        request.fields['isEncrypted'] = 'true';
+        request.fields['contentNonce'] = e2eeContentNonce;
+        request.fields['encryptedKeys'] = e2eeEncryptedKeysJson;
       }
 
       // タイムアウト付きでリクエスト送信（30秒）
@@ -214,13 +265,61 @@ class MessageService {
     final token = await AuthService.getToken();
     if (token == null) throw Exception('認証が必要です');
 
+    // =====================================
+    // E2EE 暗号化
+    // =====================================
+    String sendText = textContent;
+    Map<String, dynamic>? e2eeFields;
+
+    try {
+      final myUserId = await AuthService.getCurrentUserId();
+      if (myUserId != null) {
+        final allIds = [...receiverIds, myUserId];
+        final pkResults = await Future.wait(
+          allIds.map((id) => E2eeService.fetchPublicKey(id)),
+        );
+
+        if (pkResults.every((pk) => pk != null)) {
+          final receivers = allIds.asMap().entries.map((e) {
+            return ReceiverKey(
+              userId: allIds[e.key],
+              publicKey: pkResults[e.key]!,
+            );
+          }).toList();
+
+          // UTF-8 バイト列として暗号化
+          final contentBytes = Uint8List.fromList(textContent.codeUnits);
+          final payload = await E2eeService.encryptForReceivers(
+            contentBytes,
+            receivers,
+          );
+
+          // textContent に暗号化済みテキスト（Base64）を設定
+          sendText = payload.encryptedContent;
+          e2eeFields = {
+            'isEncrypted': true,
+            'contentNonce': payload.contentNonce,
+            'encryptedKeys': payload.encryptedKeys
+                .map((k) => k.toJson())
+                .toList(),
+          };
+        }
+      }
+    } catch (e) {
+      print('[E2EE] テキスト暗号化スキップ: $e');
+    }
+
     final response = await http.post(
       Uri.parse('$BASE_URL/messages/send-text'),
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({'receivers': receiverIds, 'textContent': textContent}),
+      body: jsonEncode({
+        'receivers': receiverIds,
+        'textContent': sendText,
+        ...(e2eeFields ?? {}),
+      }),
     );
 
     if (response.statusCode != 201) {
@@ -471,6 +570,7 @@ class MessageService {
   static Future<String> downloadMessage({
     required String messageId,
     required String savePath,
+    MessageInfo? messageInfo, // E2EE復号用
   }) async {
     final token = await AuthService.getToken();
     if (token == null) {
@@ -483,9 +583,30 @@ class MessageService {
     );
 
     if (response.statusCode == 200) {
-      // ファイルに書き込み
+      Uint8List fileBytes = response.bodyBytes;
+
+      // E2EE 復号（暗号化メッセージの場合）
+      if (messageInfo?.isEncrypted == true &&
+          messageInfo!.contentNonce != null &&
+          messageInfo.encryptedKeys.isNotEmpty) {
+        final myUserId = await AuthService.getCurrentUserId();
+        if (myUserId != null) {
+          final decryptedBytes = await E2eeService.decryptBytes(
+            encryptedBytes: fileBytes,
+            contentNonceB64: messageInfo.contentNonce!,
+            encryptedKeys: messageInfo.encryptedKeys,
+            myUserId: myUserId,
+          );
+          if (decryptedBytes != null) {
+            fileBytes = decryptedBytes;
+          } else {
+            print('[E2EE] 音声ファイルの復号に失敗しました');
+          }
+        }
+      }
+
       final file = File(savePath);
-      await file.writeAsBytes(response.bodyBytes);
+      await file.writeAsBytes(fileBytes);
       return savePath;
     } else {
       final error = jsonDecode(response.body);
@@ -699,7 +820,8 @@ class MessageService {
     final response = await http
         .delete(
           Uri.parse(
-              '$BASE_URL/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}'),
+            '$BASE_URL/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}',
+          ),
           headers: {'Authorization': 'Bearer $token'},
         )
         .timeout(const Duration(seconds: 10));
@@ -730,7 +852,16 @@ class MessageService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return jsonList.map((json) => MessageInfo.fromJson(json)).toList();
+        final messages = jsonList
+            .map((json) => MessageInfo.fromJson(json))
+            .toList();
+
+        // E2EE テキストメッセージを復号
+        final myUserId = await AuthService.getCurrentUserId();
+        if (myUserId != null) {
+          return await _decryptTextMessages(messages, myUserId);
+        }
+        return messages;
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? 'メッセージの取得に失敗しました');
@@ -745,7 +876,65 @@ class MessageService {
   }
 }
 
-/// オフライン保存が行われたことを示す例外
+/// ========================================
+/// E2EE テキストメッセージ一括復号ヘルパー
+/// ========================================
+/// テキストメッセージで isEncrypted=true のものを復号して
+/// textContent を平文に置き換えた新しい MessageInfo リストを返す
+Future<List<MessageInfo>> _decryptTextMessages(
+  List<MessageInfo> messages,
+  String myUserId,
+) async {
+  final result = <MessageInfo>[];
+  for (final msg in messages) {
+    if (msg.isEncrypted &&
+        msg.messageType == 'text' &&
+        msg.textContent != null &&
+        msg.contentNonce != null &&
+        msg.encryptedKeys.isNotEmpty) {
+      try {
+        final plainBytes = await E2eeService.decryptContent(
+          encryptedContentB64: msg.textContent!,
+          contentNonceB64: msg.contentNonce!,
+          encryptedKeys: msg.encryptedKeys,
+          myUserId: myUserId,
+        );
+        if (plainBytes != null) {
+          // 復号されたバイト列を UTF-8 文字列に変換して textContent を差し替える
+          result.add(
+            MessageInfo(
+              id: msg.id,
+              senderId: msg.senderId,
+              senderUsername: msg.senderUsername,
+              senderProfileImage: msg.senderProfileImage,
+              messageType: msg.messageType,
+              textContent: String.fromCharCodes(plainBytes),
+              isMine: msg.isMine,
+              filePath: msg.filePath,
+              fileSize: msg.fileSize,
+              duration: msg.duration,
+              mimeType: msg.mimeType,
+              thumbnailUrl: msg.thumbnailUrl,
+              sentAt: msg.sentAt,
+              isRead: msg.isRead,
+              readAt: msg.readAt,
+              reactions: msg.reactions,
+              isEncrypted: msg.isEncrypted,
+              contentNonce: msg.contentNonce,
+              encryptedKeys: msg.encryptedKeys,
+            ),
+          );
+          continue;
+        }
+      } catch (e) {
+        print('[E2EE] テキスト復号エラー (${msg.id}): $e');
+      }
+    }
+    result.add(msg);
+  }
+  return result;
+}
+
 /// sendMessage がオフライン保存にフォールバックした際にスローされる
 class _OfflineSavedException implements Exception {
   final String messageId;

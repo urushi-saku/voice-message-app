@@ -122,6 +122,51 @@ const messageSchema = new mongoose.Schema(
       },
     ],
 
+    // ========================================
+    // E2EE（エンドツーエンド暗号化）フィールド
+    // ========================================
+    // E2EE が有効かどうか
+    isEncrypted: {
+      type: Boolean,
+      default: false,
+    },
+
+    // 暗号化済みコンテンツ（Base64）
+    // isEncrypted=true の場合、filePath/textContent の代わりにこちらを使用
+    encryptedContent: {
+      type: String,
+      default: null,
+    },
+
+    // secretbox用ノンス（Base64）
+    contentNonce: {
+      type: String,
+      default: null,
+    },
+
+    // 受信者ごとのメッセージ鍵（box で暗号化済み）
+    encryptedKeys: [
+      {
+        // 受信者 ID
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+        },
+        // nacl.box で暗号化された 32バイトのメッセージ鍵（Base64）
+        encryptedKey: {
+          type: String,
+        },
+        // このエントリで使用された一時公開鍵（Base64）
+        ephemeralPublicKey: {
+          type: String,
+        },
+        // box用ノンス（Base64）
+        keyNonce: {
+          type: String,
+        },
+      },
+    ],
+
     // リアクション
     reactions: [
       {

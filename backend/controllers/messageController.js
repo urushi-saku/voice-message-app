@@ -85,7 +85,18 @@ exports.sendMessage = async (req, res) => {
       duration: duration ? parseInt(duration) : null,
       mimeType: file.mimetype,
       attachedImage: thumbnailFile ? thumbnailFile.path : null,
-      readStatus: readStatus
+      readStatus: readStatus,
+      // =====================================
+      // E2EE フィールド（期忘じなく唯一な追加局面）
+      // isEncrypted=true の場合、音声ファイルは暗号化済み
+      // =====================================
+      ...(req.body.isEncrypted === 'true' && {
+        isEncrypted: true,
+        contentNonce: req.body.contentNonce,
+        encryptedKeys: req.body.encryptedKeys
+          ? JSON.parse(req.body.encryptedKeys)
+          : [],
+      }),
     });
 
     await newMessage.save();
@@ -165,7 +176,20 @@ exports.sendTextMessage = async (req, res) => {
       receivers: receiverIds,
       messageType: 'text',
       textContent: textContent.trim(),
-      readStatus
+      readStatus,
+      // =====================================
+      // E2EE フィールド
+      // isEncrypted=true の場合、textContent は暗号化済みテキスト
+      // =====================================
+      ...(req.body.isEncrypted && {
+        isEncrypted: true,
+        contentNonce: req.body.contentNonce,
+        encryptedKeys: req.body.encryptedKeys
+          ? (Array.isArray(req.body.encryptedKeys)
+              ? req.body.encryptedKeys
+              : JSON.parse(req.body.encryptedKeys))
+          : [],
+      }),
     });
 
     await newMessage.save();
@@ -853,6 +877,17 @@ exports.getThreadMessages = async (req, res) => {
           userId: r.userId.toString(),
           username: r.username,
         })),
+        // E2EE フィールド（isEncrypted=true の場合のみ値が入る）
+        isEncrypted: message.isEncrypted || false,
+        contentNonce: message.contentNonce || null,
+        encryptedKeys: message.isEncrypted
+          ? (message.encryptedKeys || []).map(k => ({
+              userId: k.userId.toString(),
+              encryptedKey: k.encryptedKey,
+              ephemeralPublicKey: k.ephemeralPublicKey,
+              keyNonce: k.keyNonce,
+            }))
+          : [],
       };
     });
 

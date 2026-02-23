@@ -50,8 +50,7 @@ Future<void> showMessageOptionsSheet({
             ),
             // ---- クイックリアクション行 ----
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: _kQuickEmojis.map((emoji) {

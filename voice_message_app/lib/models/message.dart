@@ -30,10 +30,10 @@ class MessageReaction {
   }
 
   Map<String, dynamic> toJson() => {
-        'emoji': emoji,
-        'userId': userId,
-        'username': username,
-      };
+    'emoji': emoji,
+    'userId': userId,
+    'username': username,
+  };
 }
 
 // ========================================
@@ -57,6 +57,13 @@ class MessageInfo {
   final DateTime? readAt;
   final List<MessageReaction> reactions;
 
+  // E2EE フィールド
+  final bool isEncrypted; // 暗号化されているか
+  final String? contentNonce; // Base64: secretbox 用ノンス
+  /// 受信者ごとの暗号化済み鍵エントリリスト
+  /// 内容: [{userId, encryptedKey, ephemeralPublicKey, keyNonce}]
+  final List<Map<String, dynamic>> encryptedKeys;
+
   const MessageInfo({
     required this.id,
     required this.senderId,
@@ -74,6 +81,9 @@ class MessageInfo {
     required this.isRead,
     this.readAt,
     this.reactions = const [],
+    this.isEncrypted = false,
+    this.contentNonce,
+    this.encryptedKeys = const [],
   });
 
   factory MessageInfo.fromJson(Map<String, dynamic> json) {
@@ -99,6 +109,12 @@ class MessageInfo {
       readAt: json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
       reactions: (json['reactions'] as List<dynamic>? ?? [])
           .map((r) => MessageReaction.fromJson(r as Map<String, dynamic>))
+          .toList(),
+      // E2EE フィールド
+      isEncrypted: json['isEncrypted'] as bool? ?? false,
+      contentNonce: json['contentNonce'] as String?,
+      encryptedKeys: (json['encryptedKeys'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
           .toList(),
     );
   }

@@ -20,6 +20,8 @@ const {
   updateProfileImage,
   getUsers,
   deleteAccount,
+  updatePublicKey,
+  getPublicKey,
 } = require('../controllers/userController');
 
 // ========================================
@@ -105,5 +107,16 @@ router.get('/:id/following', protect, getFollowing);
 // アカウント削除（自分のみ）
 // DELETE /users/:id
 router.delete('/:id', protect, deleteAccount);
+
+// ========================================
+// E2EE 公開鍵
+// ========================================
+// 自分の公開鍵を登録/更新
+// PUT /users/public-key
+router.put('/public-key', protect, updatePublicKey);
+
+// 特定ユーザーの公開鍵を取得
+// GET /users/:id/public-key
+router.get('/:id/public-key', protect, getPublicKey);
 
 module.exports = router;

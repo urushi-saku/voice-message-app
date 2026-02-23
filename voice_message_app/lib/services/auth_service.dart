@@ -18,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'fcm_service.dart';
+import 'e2ee_service.dart';
 
 /// 認証APIの基本URL（バックエンド）
 /// adb reverse tcp:3000 tcp:3000 を実行することで
@@ -91,8 +92,15 @@ class AuthService {
         if (data['data']['refreshToken'] != null) {
           await prefs.setString('refreshToken', data['data']['refreshToken']);
         }
+        // ユーザー ID をローカル保存（E2EE 郵号化で使用）
+        final userId =
+            data['data']['user']?['_id'] ?? data['data']['user']?['id'];
+        if (userId != null) await storeCurrentUserId(userId.toString());
 
-        // ④ ユーザー情報を返す
+        // ④ E2EE キーペア生成 & 公開鍵をサーバーにアップロード
+        await E2eeService.uploadPublicKey();
+
+        // ⑤ ユーザー情報を返す
         return data['data'];
       } else {
         // ② エラーレスポンスの場合
@@ -154,8 +162,15 @@ class AuthService {
         if (data['data']['refreshToken'] != null) {
           await prefs.setString('refreshToken', data['data']['refreshToken']);
         }
+        // ユーザー ID をローカル保存（E2EE 郵号化で使用）
+        final userId =
+            data['data']['user']?['_id'] ?? data['data']['user']?['id'];
+        if (userId != null) await storeCurrentUserId(userId.toString());
 
-        // ④ ユーザー情報を返す
+        // ④ E2EE キーペア生成 & 公開鍵をサーバーにアップロード
+        await E2eeService.uploadPublicKey();
+
+        // ⑤ ユーザー情報を返す
         return data['data'];
       } else {
         // ② エラーレスポンスの場合
@@ -316,5 +331,20 @@ class AuthService {
     } catch (e) {
       throw e.toString();
     }
+  }
+
+  // ========================================
+  // ユーザー ID のローカル保存 / 取得
+  // ========================================
+  /// ログイン・登録成功時に呼び出し、ユーザー ID を SharedPreferences に保存する
+  static Future<void> storeCurrentUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('currentUserId', userId);
+  }
+
+  /// SharedPreferences からユーザー ID を取得する（ネットワーク不要）
+  static Future<String?> getCurrentUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('currentUserId');
   }
 }

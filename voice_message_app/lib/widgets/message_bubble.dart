@@ -79,7 +79,11 @@ class MessageBubble extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.fromLTRB(
-              12, _showTail ? 10 : 2, 12, hasReactions ? 0 : 2),
+            12,
+            _showTail ? 10 : 2,
+            12,
+            hasReactions ? 0 : 2,
+          ),
           child: Row(
             mainAxisAlignment: _isMe
                 ? MainAxisAlignment.end
@@ -168,14 +172,12 @@ class MessageBubble extends StatelessWidget {
               bottom: 4,
             ),
             child: Align(
-              alignment:
-                  _isMe ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: _isMe ? Alignment.centerRight : Alignment.centerLeft,
               child: Wrap(
                 spacing: 4,
                 runSpacing: 4,
                 children: grouped.entries.map((e) {
-                  final hasMe =
-                      e.value.any((r) => r.userId == currentUserId);
+                  final hasMe = e.value.any((r) => r.userId == currentUserId);
                   return _ReactionChip(
                     emoji: e.key,
                     count: e.value.length,
@@ -512,9 +514,7 @@ class _ReactionChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: isHighlighted
-              ? const Color(0xFFEDE7F6)
-              : Colors.white,
+          color: isHighlighted ? const Color(0xFFEDE7F6) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isHighlighted

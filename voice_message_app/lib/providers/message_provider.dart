@@ -109,15 +109,20 @@ class MessageProvider extends ChangeNotifier {
     if (idx == -1) return;
 
     final message = _messages[idx];
-    final alreadyReacted = message.reactions
-        .any((r) => r.emoji == emoji && r.userId == currentUserId);
+    final alreadyReacted = message.reactions.any(
+      (r) => r.emoji == emoji && r.userId == currentUserId,
+    );
 
     try {
       final updatedReactions = alreadyReacted
           ? await MessageService.removeReaction(
-              messageId: messageId, emoji: emoji)
+              messageId: messageId,
+              emoji: emoji,
+            )
           : await MessageService.addReaction(
-              messageId: messageId, emoji: emoji);
+              messageId: messageId,
+              emoji: emoji,
+            );
 
       _messages[idx] = _rebuildWithReactions(message, updatedReactions);
       notifyListeners();
@@ -127,7 +132,9 @@ class MessageProvider extends ChangeNotifier {
   }
 
   MessageInfo _rebuildWithReactions(
-      MessageInfo msg, List<MessageReaction> reactions) {
+    MessageInfo msg,
+    List<MessageReaction> reactions,
+  ) {
     return MessageInfo(
       id: msg.id,
       senderId: msg.senderId,

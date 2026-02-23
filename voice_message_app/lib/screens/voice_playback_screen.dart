@@ -56,10 +56,11 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
       // ファイルが既に存在するかチェック
       final file = File(savePath);
       if (!await file.exists()) {
-        // ダウンロード
+        // ダウンロード（E2EE メッセージの場合は自動復号）
         await MessageService.downloadMessage(
           messageId: widget.message.id,
           savePath: savePath,
+          messageInfo: widget.message,
         );
       }
 

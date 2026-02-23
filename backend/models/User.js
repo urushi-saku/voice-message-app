@@ -120,6 +120,16 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ========================================
+    // E2EE（エンドツーエンド暗号化）用公開鍵
+    // ========================================
+    // X25519 公開鍵（Base64エンコード済み）
+    // 秘密鍵はサーバーに送信せず、デバイス内のSecureStorageに保管
+    publicKey: {
+      type: String,
+      default: null,
+    },
   },
   {
     // タイムスタンプを自動管理
