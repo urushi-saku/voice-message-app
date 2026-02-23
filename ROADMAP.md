@@ -68,6 +68,8 @@
 | GET    | `/messages/:id/download` | 音声ファイルダウンロード | ✅ |
 | PUT    | `/messages/:id/read` | 既読マーク | ✅ |
 | DELETE | `/messages/:id` | メッセージ削除（論理削除） | ✅ |
+| POST   | `/messages/:id/reactions` | リアクション追加（絵文字） | ✅ |
+| DELETE | `/messages/:id/reactions/:emoji` | リアクション削除 | ✅ |
 
 ### 通知
 
@@ -109,12 +111,12 @@ voice-message-app/
 │   ├── models/                         # Mongoose スキーマ定義
 │   │   ├── User.js                     # ユーザー（認証情報・プロフィール・FCMトークン・refreshToken）
 │   │   ├── Follower.js                 # フォロー関係（user ↔ follower の対）
-│   │   ├── Message.js                  # メッセージ（音声/テキスト・既読状態・論理削除）
+│   │   ├── Message.js                  # メッセージ（音声/テキスト・既読状態・論理削除・リアクション）
 │   │   └── Notification.js             # 通知（follow/message/system・既読管理）
 │   ├── controllers/                    # ビジネスロジック
 │   │   ├── authController.js           # 登録・ログイン・ログアウト・refresh・パスワードリセット
 │   │   ├── userController.js           # ユーザー一覧/詳細・フォロー・プロフィール編集・アカウント削除
-│   │   ├── messageController.js        # メッセージ送受信・検索・スレッド・既読・削除・ダウンロード
+│   │   ├── messageController.js        # メッセージ送受信・検索・スレッド・既読・削除・ダウンロード・リアクション
 │   │   ├── notificationController.js   # 通知一覧・送信・削除・既読操作
 │   │   └── groupController.js          # グループCRUD・メンバー管理・グループメッセージ
 │   ├── routes/                         # Express ルーター（URLマッピング）
@@ -165,17 +167,17 @@ voice-message-app/
         │   ├── network_connectivity_service.dart  # ネットワーク接続状態監視
         │   └── api_service.dart        # 旧汎用HTTPクライアント（レガシー）
         ├── models/                     # データクラス定義
-        │   ├── message.dart            # MessageInfo / ThreadInfo（APIレスポンス用）
+        │   ├── message.dart            # MessageInfo / ThreadInfo / MessageReaction（APIレスポンス用）
         │   ├── offline_model.dart      # オフライン保存用モデル群（Hive アダプター）
         │   └── recording_config.dart   # 録音品質設定（低/中/高プリセット）
         ├── providers/                  # Provider 状態管理
         │   ├── auth_provider.dart      # 認証状態（ログイン中ユーザー・トークン）
         │   ├── theme_provider.dart     # ダークモード ON/OFF 状態
-        │   ├── message_provider.dart   # スレッドメッセージ読み込み・送信・削除
+        │   ├── message_provider.dart   # スレッドメッセージ読み込み・送信・削除・リアクション操作
         │   └── recording_provider.dart # 録音状態・再生・サムネイル・送信フロー
         ├── widgets/                    # 再利用可能な UI コンポーネント
-        │   ├── message_bubble.dart     # チャット吹き出し（アバター・しっぽ・既読表示）
-        │   ├── message_options_sheet.dart   # メッセージ長押し時のオプションシート
+        │   ├── message_bubble.dart     # チャット吹き出し（アバター・しっぽ・既読表示・リアクションチップ）
+        │   ├── message_options_sheet.dart   # メッセージ長押しオプション（クイックリアクション行あり）
         │   ├── voice_messages_panel.dart    # 右スワイプで表示されるボイス一覧パネル
         │   ├── offline_banner.dart     # オフライン状態バナー・接続状態インジケーター
         │   ├── custom_page_route.dart  # カスタムページ遷移（SlideUp / FadeSlide / ScaleFade）
@@ -208,6 +210,11 @@ voice-message-app/
 - ダークモード / ライトモード
 - アニメーション・アクセシビリティ・レスポンシブ対応
 
+- **メッセージリアクション（絵文字）** 🆕
+  - 長押しシートのクイックリアクション行（👍 ❤️ 😂 😮 😢 🔥）
+  - バブル面のリアクションチップ表示（絵文字・件数・自分のを紫で強調表示）
+  - チップタップでトグル（再タップで取り消し）
+
 ### バックエンド (Node.js + MongoDB)
 
 - JWT 認証・bcrypt ハッシュ化
@@ -218,6 +225,8 @@ voice-message-app/
 - 論理削除・アカウント削除時のファイル物理削除
 - 通知モデル（follow / message / system）
 - グループメッセージング（グループCRUD・メンバー管理・テキスト/ボイス送信・FCM通知）
+- **リアクション追加/削除 API**（`Message.reactions` 配列フィールド）
+- **リアクション追加/削除 API**（`Message.reactions` 配列フィールド）
 
 ---
 
@@ -243,7 +252,7 @@ voice-message-app/
 ### 拡張機能（優先度低）
 
 - [x] グループメッセージング
-- [ ] メッセージへのリアクション（絵文字）
+- [x] メッセージへのリアクション（絵文字）
 - [ ] Web バージョン
 
 ---
@@ -265,6 +274,18 @@ voice-message-app/
 ---
 
 ## 更新履歴
+
+### 2026-02-23
+- リアクション機能実装
+  - Backend: `Message` モデルに `reactions` 配列フィールド追加（`{emoji, userId, username}`）
+  - Backend: `addReaction` / `removeReaction` エンドポイント — `POST /messages/:id/reactions` / `DELETE /messages/:id/reactions/:emoji`
+  - Backend: `getThreadMessages` レスポンスに `reactions` を含めるよう更新
+  - Flutter: `MessageReaction` データクラス追加、`MessageInfo` に `reactions` フィールド追加
+  - Flutter: `MessageService.addReaction` / `removeReaction` 実装
+  - Flutter: `MessageProvider.toggleReaction` 実装（楽観的UI更新）
+  - Flutter: `MessageBubble` に `_ReactionChip` 追加（絵文字・件数・自分御紫強調）
+  - Flutter: `showMessageOptionsSheet` にクイックリアクション行（👍❤️😂😮😢🔥）追加
+  - Flutter: `ThreadDetailScreen` に `AuthProvider` 連携
 
 ### 2026-02-23
 - グループメッセージング実装

@@ -653,6 +653,67 @@ class MessageService {
   /// ①保存されているJWTトークンを取得
   /// ②GET リクエスト送信
   /// ③レスポンスからMessageInfoリストを生成
+  // ========================================
+  // リアクション追加
+  // POST /messages/:id/reactions
+  // ========================================
+  static Future<List<MessageReaction>> addReaction({
+    required String messageId,
+    required String emoji,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final response = await http
+        .post(
+          Uri.parse('$BASE_URL/messages/$messageId/reactions'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'emoji': emoji}),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return (data['reactions'] as List<dynamic>)
+          .map((r) => MessageReaction.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } else {
+      throw Exception('リアクションの追加に失敗しました');
+    }
+  }
+
+  // ========================================
+  // リアクション削除
+  // DELETE /messages/:id/reactions/:emoji
+  // ========================================
+  static Future<List<MessageReaction>> removeReaction({
+    required String messageId,
+    required String emoji,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final response = await http
+        .delete(
+          Uri.parse(
+              '$BASE_URL/messages/$messageId/reactions/${Uri.encodeComponent(emoji)}'),
+          headers: {'Authorization': 'Bearer $token'},
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return (data['reactions'] as List<dynamic>)
+          .map((r) => MessageReaction.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } else {
+      throw Exception('リアクションの削除に失敗しました');
+    }
+  }
+
   static Future<List<MessageInfo>> getThreadMessages(String senderId) async {
     final token = await AuthService.getToken();
     if (token == null) {

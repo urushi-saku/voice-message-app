@@ -705,6 +705,97 @@ exports.getMessageThreads = async (req, res) => {
 // GET /messages/thread/:partnerId
 // ========================================
 // 指定ユーザーとの会話（送受信両方）を取得します
+// ========================================
+// リアクション追加
+// POST /messages/:id/reactions
+// ========================================
+// 指定メッセージに絵文字リアクションを付与します（同じ絵文字は1ユーザー1回のみ）
+exports.addReaction = async (req, res) => {
+  try {
+    const messageId = req.params.id;
+    const userId = req.user.id;
+    const username = req.user.username;
+    const { emoji } = req.body;
+
+    if (!emoji || typeof emoji !== 'string') {
+      return res.status(400).json({ error: '絵文字を指定してください' });
+    }
+
+    const message = await Message.findOne({ _id: messageId, isDeleted: false });
+    if (!message) {
+      return res.status(404).json({ error: 'メッセージが見つかりません' });
+    }
+
+    // 送信者または受信者のみリアクション可能
+    const isSender   = message.sender.toString() === userId;
+    const isReceiver = message.receivers.some(r => r.toString() === userId);
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({ error: 'このメッセージへのアクセス権がありません' });
+    }
+
+    // 同じ絵文字が既にある場合はスキップ（トグル扱いではなく冪等）
+    const alreadyReacted = message.reactions.some(
+      r => r.emoji === emoji && r.userId.toString() === userId
+    );
+    if (alreadyReacted) {
+      return res.json({ message: 'すでにリアクション済みです', reactions: message.reactions });
+    }
+
+    message.reactions.push({ emoji, userId, username });
+    await message.save();
+
+    // レスポンス用に整形
+    const reactionsOut = message.reactions.map(r => ({
+      emoji: r.emoji,
+      userId: r.userId.toString(),
+      username: r.username,
+    }));
+    res.json({ message: 'リアクションを追加しました', reactions: reactionsOut });
+  } catch (error) {
+    console.error('リアクション追加エラー:', error);
+    res.status(500).json({ error: 'リアクションの追加に失敗しました' });
+  }
+};
+
+// ========================================
+// リアクション削除
+// DELETE /messages/:id/reactions/:emoji
+// ========================================
+// 自分が付けた指定絵文字のリアクションを削除します
+exports.removeReaction = async (req, res) => {
+  try {
+    const messageId = req.params.id;
+    const userId = req.user.id;
+    const emoji = decodeURIComponent(req.params.emoji);
+
+    const message = await Message.findOne({ _id: messageId, isDeleted: false });
+    if (!message) {
+      return res.status(404).json({ error: 'メッセージが見つかりません' });
+    }
+
+    const before = message.reactions.length;
+    message.reactions = message.reactions.filter(
+      r => !(r.emoji === emoji && r.userId.toString() === userId)
+    );
+
+    if (message.reactions.length === before) {
+      return res.status(404).json({ error: '該当するリアクションが見つかりません' });
+    }
+
+    await message.save();
+
+    const reactionsOut = message.reactions.map(r => ({
+      emoji: r.emoji,
+      userId: r.userId.toString(),
+      username: r.username,
+    }));
+    res.json({ message: 'リアクションを削除しました', reactions: reactionsOut });
+  } catch (error) {
+    console.error('リアクション削除エラー:', error);
+    res.status(500).json({ error: 'リアクションの削除に失敗しました' });
+  }
+};
+
 exports.getThreadMessages = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -756,7 +847,12 @@ exports.getThreadMessages = async (req, res) => {
         attachedImage: message.attachedImage || null,
         sentAt: message.sentAt,
         isRead,
-        readAt
+        readAt,
+        reactions: (message.reactions || []).map(r => ({
+          emoji: r.emoji,
+          userId: r.userId.toString(),
+          username: r.username,
+        })),
       };
     });
 

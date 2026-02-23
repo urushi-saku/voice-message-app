@@ -8,6 +8,35 @@
 import '../services/auth_service.dart'; // BASE_URL のみ使用
 
 // ========================================
+// リアクション情報
+// ========================================
+class MessageReaction {
+  final String emoji;
+  final String userId;
+  final String username;
+
+  const MessageReaction({
+    required this.emoji,
+    required this.userId,
+    required this.username,
+  });
+
+  factory MessageReaction.fromJson(Map<String, dynamic> json) {
+    return MessageReaction(
+      emoji: json['emoji'] as String,
+      userId: json['userId'] as String,
+      username: json['username'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'emoji': emoji,
+        'userId': userId,
+        'username': username,
+      };
+}
+
+// ========================================
 // メッセージ情報
 // ========================================
 class MessageInfo {
@@ -26,6 +55,7 @@ class MessageInfo {
   final DateTime sentAt;
   final bool isRead;
   final DateTime? readAt;
+  final List<MessageReaction> reactions;
 
   const MessageInfo({
     required this.id,
@@ -43,6 +73,7 @@ class MessageInfo {
     required this.sentAt,
     required this.isRead,
     this.readAt,
+    this.reactions = const [],
   });
 
   factory MessageInfo.fromJson(Map<String, dynamic> json) {
@@ -66,6 +97,9 @@ class MessageInfo {
       sentAt: DateTime.parse(json['sentAt']),
       isRead: json['isRead'] ?? false,
       readAt: json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
+      reactions: (json['reactions'] as List<dynamic>? ?? [])
+          .map((r) => MessageReaction.fromJson(r as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

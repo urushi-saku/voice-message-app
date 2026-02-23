@@ -96,4 +96,55 @@ class MessageProvider extends ChangeNotifier {
     await MessageService.deleteMessage(messageId);
     await loadMessagesWithoutMarkingRead(senderId);
   }
+
+  // ========================================
+  // リアクション トグル（追加/削除）
+  // ========================================
+  Future<void> toggleReaction({
+    required String messageId,
+    required String emoji,
+    required String currentUserId,
+  }) async {
+    final idx = _messages.indexWhere((m) => m.id == messageId);
+    if (idx == -1) return;
+
+    final message = _messages[idx];
+    final alreadyReacted = message.reactions
+        .any((r) => r.emoji == emoji && r.userId == currentUserId);
+
+    try {
+      final updatedReactions = alreadyReacted
+          ? await MessageService.removeReaction(
+              messageId: messageId, emoji: emoji)
+          : await MessageService.addReaction(
+              messageId: messageId, emoji: emoji);
+
+      _messages[idx] = _rebuildWithReactions(message, updatedReactions);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('リアクション操作エラー: $e');
+    }
+  }
+
+  MessageInfo _rebuildWithReactions(
+      MessageInfo msg, List<MessageReaction> reactions) {
+    return MessageInfo(
+      id: msg.id,
+      senderId: msg.senderId,
+      senderUsername: msg.senderUsername,
+      senderProfileImage: msg.senderProfileImage,
+      messageType: msg.messageType,
+      textContent: msg.textContent,
+      isMine: msg.isMine,
+      filePath: msg.filePath,
+      fileSize: msg.fileSize,
+      duration: msg.duration,
+      mimeType: msg.mimeType,
+      thumbnailUrl: msg.thumbnailUrl,
+      sentAt: msg.sentAt,
+      isRead: msg.isRead,
+      readAt: msg.readAt,
+      reactions: reactions,
+    );
+  }
 }

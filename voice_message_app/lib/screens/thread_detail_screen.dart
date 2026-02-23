@@ -13,7 +13,9 @@
 // - showMessageOptionsSheet : 長押しオプションシート
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/message.dart';
+import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../services/user_service.dart';
 import '../widgets/message_bubble.dart';
@@ -51,6 +53,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   // ========================================
   late String _displayName;
   String? _displayProfileImage;
+  String _currentUserId = '';
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -84,6 +87,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
         .animate(
           CurvedAnimation(parent: _panelController, curve: Curves.easeOutCubic),
         );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authUser = context.read<AuthProvider>().user;
+    if (authUser != null) {
+      _currentUserId = authUser.id;
+    }
   }
 
   void _onMessagesChanged() {
@@ -354,9 +366,21 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                   index: i,
                   displayName: _displayName,
                   displayProfileImage: _displayProfileImage,
+                  currentUserId: _currentUserId,
+                  onReactionTap: (emoji) => _messageProvider.toggleReaction(
+                    messageId: message.id,
+                    emoji: emoji,
+                    currentUserId: _currentUserId,
+                  ),
                   onLongPress: () => showMessageOptionsSheet(
                     context: context,
                     message: message,
+                    currentUserId: _currentUserId,
+                    onReactionTap: (emoji) => _messageProvider.toggleReaction(
+                      messageId: message.id,
+                      emoji: emoji,
+                      currentUserId: _currentUserId,
+                    ),
                     onPlayback: () => _openPlayback(message),
                     onDelete: () => _messageProvider.deleteMessage(
                       message.id,

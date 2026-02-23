@@ -36,6 +36,12 @@ class MessageBubble extends StatelessWidget {
   /// ボイスメッセージのタップ時（再生画面を開く）
   final VoidCallback onPlaybackTap;
 
+  /// ログイン中のユーザーID（リアクション強調表示用）
+  final String currentUserId;
+
+  /// リアクションチップタップ時コールバック
+  final void Function(String emoji)? onReactionTap;
+
   const MessageBubble({
     super.key,
     required this.message,
@@ -45,94 +51,142 @@ class MessageBubble extends StatelessWidget {
     required this.onLongPress,
     required this.onAvatarTap,
     required this.onPlaybackTap,
+    this.currentUserId = '',
+    this.onReactionTap,
   });
 
   // グループ先頭（しっぽ・アバター表示）
   bool get _showTail => index % 4 == 0;
   bool get _isMe => message.isMine;
 
+  // リアクションを絵文字ごとにグループ化
+  Map<String, List<MessageReaction>> get _grouped {
+    final map = <String, List<MessageReaction>>{};
+    for (final r in message.reactions) {
+      map.putIfAbsent(r.emoji, () => []).add(r);
+    }
+    return map;
+  }
+
   @override
   Widget build(BuildContext context) {
     final showAvatar = !_isMe && _showTail;
+    final grouped = _grouped;
+    final hasReactions = grouped.isNotEmpty;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(12, _showTail ? 10 : 2, 12, 2),
-      child: Row(
-        mainAxisAlignment: _isMe
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ---- 相手側アバター ----
-          if (!_isMe) ...[
-            if (showAvatar)
-              GestureDetector(
-                onTap: onAvatarTap,
-                child: _SenderAvatar(
-                  displayName: displayName,
-                  displayProfileImage: displayProfileImage,
-                ),
-              )
-            else
-              const SizedBox(width: 36),
-            const SizedBox(width: 8),
-          ],
-
-          // ---- バブル本体 ----
-          Flexible(
-            child: Row(
-              mainAxisAlignment: _isMe
-                  ? MainAxisAlignment.end
-                  : MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (_isMe) ...[
-                  MessageTimestamp(message: message, isMe: true),
-                  const SizedBox(width: 6),
-                ],
-                GestureDetector(
-                  onLongPress: onLongPress,
-                  child: IntrinsicWidth(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        _BubbleContainer(
-                          message: message,
-                          isMe: _isMe,
-                          showTail: _showTail,
-                          onPlaybackTap: onPlaybackTap,
-                        ),
-                        // しっぽ（グループ先頭のみ・上側）
-                        if (_showTail)
-                          Positioned(
-                            top: 0,
-                            left: _isMe ? null : -10,
-                            right: _isMe ? -10 : null,
-                            child: CustomPaint(
-                              size: const Size(10, 10),
-                              painter: TailPainter(
-                                isMe: _isMe,
-                                color: _isMe
-                                    ? const Color(0xFF7C4DFF)
-                                    : Colors.white,
-                              ),
-                            ),
-                          ),
-                      ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+              12, _showTail ? 10 : 2, 12, hasReactions ? 0 : 2),
+          child: Row(
+            mainAxisAlignment: _isMe
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ---- 相手側アバター ----
+              if (!_isMe) ...[
+                if (showAvatar)
+                  GestureDetector(
+                    onTap: onAvatarTap,
+                    child: _SenderAvatar(
+                      displayName: displayName,
+                      displayProfileImage: displayProfileImage,
                     ),
-                  ),
-                ),
-                if (!_isMe) ...[
-                  const SizedBox(width: 6),
-                  MessageTimestamp(message: message, isMe: false),
-                ],
+                  )
+                else
+                  const SizedBox(width: 36),
+                const SizedBox(width: 8),
               ],
+
+              // ---- バブル本体 ----
+              Flexible(
+                child: Row(
+                  mainAxisAlignment: _isMe
+                      ? MainAxisAlignment.end
+                      : MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (_isMe) ...[
+                      MessageTimestamp(message: message, isMe: true),
+                      const SizedBox(width: 6),
+                    ],
+                    GestureDetector(
+                      onLongPress: onLongPress,
+                      child: IntrinsicWidth(
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            _BubbleContainer(
+                              message: message,
+                              isMe: _isMe,
+                              showTail: _showTail,
+                              onPlaybackTap: onPlaybackTap,
+                            ),
+                            // しっぽ（グループ先頭のみ・上側）
+                            if (_showTail)
+                              Positioned(
+                                top: 0,
+                                left: _isMe ? null : -10,
+                                right: _isMe ? -10 : null,
+                                child: CustomPaint(
+                                  size: const Size(10, 10),
+                                  painter: TailPainter(
+                                    isMe: _isMe,
+                                    color: _isMe
+                                        ? const Color(0xFF7C4DFF)
+                                        : Colors.white,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    if (!_isMe) ...[
+                      const SizedBox(width: 6),
+                      MessageTimestamp(message: message, isMe: false),
+                    ],
+                  ],
+                ),
+              ),
+
+              if (_isMe) const SizedBox(width: 4),
+            ],
+          ),
+        ),
+
+        // ---- リアクションチップ ----
+        if (hasReactions)
+          Padding(
+            padding: EdgeInsets.only(
+              left: _isMe ? 12 : 56, // 相手側: avatar(36)+gap(8)+padding(12)
+              right: 12,
+              top: 3,
+              bottom: 4,
+            ),
+            child: Align(
+              alignment:
+                  _isMe ? Alignment.centerRight : Alignment.centerLeft,
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: grouped.entries.map((e) {
+                  final hasMe =
+                      e.value.any((r) => r.userId == currentUserId);
+                  return _ReactionChip(
+                    emoji: e.key,
+                    count: e.value.length,
+                    isHighlighted: hasMe,
+                    onTap: () => onReactionTap?.call(e.key),
+                  );
+                }).toList(),
+              ),
             ),
           ),
-
-          if (_isMe) const SizedBox(width: 4),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -429,6 +483,72 @@ class VoiceBubbleContent extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ========================================
+// リアクションチップ
+// ========================================
+class _ReactionChip extends StatelessWidget {
+  final String emoji;
+  final int count;
+  final bool isHighlighted;
+  final VoidCallback onTap;
+
+  const _ReactionChip({
+    required this.emoji,
+    required this.count,
+    required this.isHighlighted,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          color: isHighlighted
+              ? const Color(0xFFEDE7F6)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isHighlighted
+                ? const Color(0xFF7C4DFF)
+                : Colors.grey.shade300,
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 14)),
+            if (count > 1) ...[
+              const SizedBox(width: 3),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isHighlighted
+                      ? const Color(0xFF7C4DFF)
+                      : Colors.black54,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

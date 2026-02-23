@@ -21,6 +21,8 @@ const {
   getMessageThreads,
   getThreadMessages,
   getMessageById,
+  addReaction,
+  removeReaction,
 } = require('../controllers/messageController');
 
 // ========================================
@@ -110,6 +112,14 @@ router.put('/:id/read', protect, markAsRead);
 // メッセージ削除
 // DELETE /messages/:id
 router.delete('/:id', protect, deleteMessage);
+
+// リアクション追加
+// POST /messages/:id/reactions
+router.post('/:id/reactions', protect, addReaction);
+
+// リアクション削除
+// DELETE /messages/:id/reactions/:emoji
+router.delete('/:id/reactions/:emoji', protect, removeReaction);
 
 // 音声ファイルダウンロード
 // GET /messages/:id/download

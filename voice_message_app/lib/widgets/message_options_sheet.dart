@@ -8,18 +8,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/message.dart';
 
+/// クイックリアクション絵文字リスト
+const _kQuickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
 /// メッセージ長押し時のオプションシートを表示する
 ///
 /// 【パラメータ】
 /// - context: BuildContext（Navigator・ScaffoldMessenger 用）
 /// - message: 対象メッセージ
+/// - currentUserId: ログイン中ユーザーのID（リアクション強調表示用）
 /// - onPlayback: 再生ボタンタップ時コールバック
 /// - onDelete: 削除確定後に呼ばれる非同期処理（MessageProvider.deleteMessage など）
+/// - onReactionTap: 絵文字タップ時コールバック（emoji を渡す）
 Future<void> showMessageOptionsSheet({
   required BuildContext context,
   required MessageInfo message,
   required VoidCallback onPlayback,
   required Future<void> Function() onDelete,
+  String currentUserId = '',
+  void Function(String emoji)? onReactionTap,
 }) async {
   await showModalBottomSheet(
     context: context,
@@ -41,6 +48,49 @@ Future<void> showMessageOptionsSheet({
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // ---- クイックリアクション行 ----
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: _kQuickEmojis.map((emoji) {
+                  final alreadyReacted = message.reactions.any(
+                    (r) => r.emoji == emoji && r.userId == currentUserId,
+                  );
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(sheetCtx);
+                      onReactionTap?.call(emoji);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: alreadyReacted
+                            ? const Color(0xFFEDE7F6)
+                            : Colors.grey.shade100,
+                        shape: BoxShape.circle,
+                        border: alreadyReacted
+                            ? Border.all(
+                                color: const Color(0xFF7C4DFF),
+                                width: 1.8,
+                              )
+                            : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          emoji,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const Divider(height: 1),
             // ---- テキストのみ: コピー ----
             if (message.messageType == 'text' && message.textContent != null)
               ListTile(

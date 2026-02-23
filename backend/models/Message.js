@@ -121,6 +121,25 @@ const messageSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+
+    // リアクション
+    reactions: [
+      {
+        emoji: {
+          type: String,
+          required: true,
+        },
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        username: {
+          type: String,
+          required: true,
+        },
+      },
+    ],
   },
   {
     timestamps: true,
