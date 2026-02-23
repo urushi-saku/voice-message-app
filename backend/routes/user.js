@@ -20,7 +20,6 @@ const {
   updateProfileImage,
   getUsers,
   deleteAccount,
-  getUserSuggestions,
 } = require('../controllers/userController');
 
 // ========================================
@@ -102,10 +101,6 @@ router.get('/:id/followers', protect, getFollowers);
 // フォロー中リスト取得
 // GET /users/:id/following
 router.get('/:id/following', protect, getFollowing);
-
-// おすすめユーザー取得
-// GET /users/:id/suggestions
-router.get('/:id/suggestions', protect, getUserSuggestions);
 
 // アカウント削除（自分のみ）
 // DELETE /users/:id

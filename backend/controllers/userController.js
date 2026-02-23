@@ -119,49 +119,6 @@ exports.deleteAccount = async (req, res) => {
 };
 
 // ========================================
-// おすすめユーザー取得
-// GET /users/:id/suggestions?limit=10
-// ========================================
-// 「自分がフォローしている人がフォローしているユーザー」を提案。
-// 既にフォロー済み・自分自身は除外します。
-exports.getUserSuggestions = async (req, res) => {
-  try {
-    const userId = req.params.id;
-    const limit  = Math.min(20, parseInt(req.query.limit) || 10);
-
-    // 自分がフォローしている人のIDリスト
-    const myFollowing = await Follower.find({ follower: userId }).select('user');
-    const followingIds = myFollowing.map(f => f.user.toString());
-
-    // フォロー中の人がフォローしている人のIDリスト
-    const secondDegree = await Follower.find({
-      follower: { $in: followingIds },
-      user:     { $nin: [...followingIds, userId] }, // 既フォロー・自分を除外
-    }).distinct('user');
-
-    let suggestions = await User.find({ _id: { $in: secondDegree } })
-      .select('username handle profileImage bio followersCount followingCount')
-      .sort({ followersCount: -1 })
-      .limit(limit);
-
-    // 2nd-degree が足りない場合はフォロワー数が多い人で補完
-    if (suggestions.length < limit) {
-      const excludeIds = [...followingIds, userId, ...suggestions.map(u => u._id.toString())];
-      const filler = await User.find({ _id: { $nin: excludeIds } })
-        .select('username handle profileImage bio followersCount followingCount')
-        .sort({ followersCount: -1 })
-        .limit(limit - suggestions.length);
-      suggestions = [...suggestions, ...filler];
-    }
-
-    res.json(suggestions);
-  } catch (error) {
-    console.error('おすすめユーザー取得エラー:', error);
-    res.status(500).json({ error: 'おすすめユーザーの取得に失敗しました' });
-  }
-};
-
-// ========================================
 // ユーザー検索
 // GET /users/search?q=username
 // ========================================

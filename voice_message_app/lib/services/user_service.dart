@@ -380,36 +380,4 @@ class UserService {
     }
   }
 
-  /// ========================================
-  /// おすすめユーザー取得
-  /// GET /users/:id/suggestions?limit=10
-  /// ========================================
-  /// 「自分がフォローしている人がフォローしているユーザー」を最大 limit 件返す。
-  /// 2nd-degree が少ない場合はフォロワー数が多い人で補完される。
-  static Future<List<UserInfo>> getUserSuggestions(
-    String userId, {
-    int limit = 10,
-  }) async {
-    final token = await AuthService.getToken();
-    if (token == null) throw Exception('認証が必要です');
-
-    final uri = Uri.parse('$BASE_URL/users/$userId/suggestions')
-        .replace(queryParameters: {'limit': limit.toString()});
-
-    final response = await http.get(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((u) => UserInfo.fromJson(u)).toList();
-    } else {
-      final error = jsonDecode(response.body);
-      throw Exception(error['error'] ?? 'おすすめユーザーの取得に失敗しました');
-    }
-  }
 }

@@ -912,14 +912,12 @@ voice-message-app/
 ✅ GET    /users/:id              - ユーザー詳細
 ✅ GET    /users/:id/followers    - フォロワー一覧
 ✅ GET    /users/:id/following    - フォロー中一覧
-✅ GET    /users/:id/suggestions  - おすすめユーザー（2nd-degree + 補完）
 ✅ DELETE /users/:id              - アカウント削除（自分のみ・関連データ一括削除）
 ⏳ PUT    /users/:id              - プロフィール更新（/users/profile を使用）
 
 【フォロー関連API】
 ✅ POST   /users/:id/follow       - フォロー
 ✅ DELETE /users/:id/follow       - フォロー解除
-✅ GET    /users/:id/suggestions  - おすすめユーザー（2nd-degree + フォロワー数補完）
 
 【メッセージAPI】
 ✅ POST   /messages/send          - メッセージ送信（multipart/form-data）
@@ -980,14 +978,12 @@ voice-message-app/
 2026-02-23: ユーザーAPI拡張 ✅
   - backend/controllers/userController.js 追加
     ├─ GET /users: ページング・キーワード絞り込み対応のユーザー一覧
-    ├─ DELETE /users/:id: アカウント削除（プロフィール画像・音声ファイル・フォロー関係・メッセージを一括削除）
-    └─ GET /users/:id/suggestions: 2nd-degreeフォロー提案（不足分はフォロワー数上位で補完）
+    └─ DELETE /users/:id: アカウント削除（プロフィール画像・音声ファイル・フォロー関係・メッセージを一括削除）
   - backend/routes/user.js 更新
-    ├─ GET / (一覧)・DELETE /:id・GET /:id/suggestions を追加
+    ├─ GET / (一覧)・DELETE /:id を追加
   - voice_message_app/lib/services/user_service.dart 更新
     ├─ getUsers(): ページング＋絞り込み対応
-    ├─ deleteAccount(): アカウント削除
-    └─ getUserSuggestions(): おすすめユーザー取得
+    └─ deleteAccount(): アカウント削除
 
 2026-02-23: 認証API拡張（logout / token refresh / password reset）✅
   - backend/models/User.js 更新
