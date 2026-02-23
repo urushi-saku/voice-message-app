@@ -17,7 +17,10 @@ const {
   getFollowing,
   getUserById,
   updateProfile,
-  updateProfileImage
+  updateProfileImage,
+  getUsers,
+  deleteAccount,
+  getUserSuggestions,
 } = require('../controllers/userController');
 
 // ========================================
@@ -64,6 +67,10 @@ const upload = multer({
 // protect ミドルウェアを適用して、
 // JWTトークンによる認証を必須にします
 
+// ユーザー一覧取得（ページング対応）
+// GET /users?page=1&limit=20&q=
+router.get('/', protect, getUsers);
+
 // ユーザー検索
 // GET /users/search?q=username
 router.get('/search', protect, searchUsers);
@@ -95,5 +102,13 @@ router.get('/:id/followers', protect, getFollowers);
 // フォロー中リスト取得
 // GET /users/:id/following
 router.get('/:id/following', protect, getFollowing);
+
+// おすすめユーザー取得
+// GET /users/:id/suggestions
+router.get('/:id/suggestions', protect, getUserSuggestions);
+
+// アカウント削除（自分のみ）
+// DELETE /users/:id
+router.delete('/:id', protect, deleteAccount);
 
 module.exports = router;

@@ -306,4 +306,110 @@ class UserService {
       throw Exception(error['error'] ?? 'プロフィール画像の更新に失敗しました');
     }
   }
+
+  /// ========================================
+  /// ユーザー一覧取得（ページング）
+  /// GET /users?page=1&limit=20&q=
+  /// ========================================
+  /// 【パラメータ】
+  /// - page  : ページ番号（1始まり）
+  /// - limit : 1ページあたりの件数（最大50）
+  /// - query : 絞り込みキーワード（省略可）
+  ///
+  /// 【戻り値】
+  /// - users      : ユーザーリスト
+  /// - pagination : ページング情報（total / page / totalPages / hasNext）
+  static Future<Map<String, dynamic>> getUsers({
+    int page = 1,
+    int limit = 20,
+    String? query,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final params = {
+      'page': page.toString(),
+      'limit': limit.toString(),
+      if (query != null && query.isNotEmpty) 'q': query,
+    };
+    final uri = Uri.parse('$BASE_URL/users').replace(queryParameters: params);
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return {
+        'users': (data['users'] as List)
+            .map((u) => UserInfo.fromJson(u))
+            .toList(),
+        'pagination': data['pagination'],
+      };
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'ユーザー一覧の取得に失敗しました');
+    }
+  }
+
+  /// ========================================
+  /// アカウント削除
+  /// DELETE /users/:id
+  /// ========================================
+  /// 自分のアカウントのみ削除可能。
+  /// 成功後はローカルの認証情報もクリアしてください（logout を呼ぶこと）。
+  static Future<void> deleteAccount(String userId) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final response = await http.delete(
+      Uri.parse('$BASE_URL/users/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'アカウントの削除に失敗しました');
+    }
+  }
+
+  /// ========================================
+  /// おすすめユーザー取得
+  /// GET /users/:id/suggestions?limit=10
+  /// ========================================
+  /// 「自分がフォローしている人がフォローしているユーザー」を最大 limit 件返す。
+  /// 2nd-degree が少ない場合はフォロワー数が多い人で補完される。
+  static Future<List<UserInfo>> getUserSuggestions(
+    String userId, {
+    int limit = 10,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    final uri = Uri.parse('$BASE_URL/users/$userId/suggestions')
+        .replace(queryParameters: {'limit': limit.toString()});
+
+    final response = await http.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((u) => UserInfo.fromJson(u)).toList();
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'おすすめユーザーの取得に失敗しました');
+    }
+  }
 }

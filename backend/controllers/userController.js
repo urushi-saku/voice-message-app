@@ -6,6 +6,160 @@
 
 const User = require('../models/User');
 const Follower = require('../models/Follower');
+const Message = require('../models/Message');
+const fs = require('fs').promises;
+
+// ========================================
+// ユーザー一覧取得
+// GET /users?page=1&limit=20&q=
+// ========================================
+// ページング付き全ユーザー一覧。q を渡すと handle/username で絞り込み。
+// 自分自身は除外します。
+exports.getUsers = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const q     = req.query.q?.trim();
+    const skip  = (page - 1) * limit;
+
+    const filter = { _id: { $ne: currentUserId } };
+    if (q) {
+      filter.$or = [
+        { handle:   { $regex: q, $options: 'i' } },
+        { username: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      User.find(filter)
+        .select('username handle profileImage bio followersCount followingCount')
+        .sort({ followersCount: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({
+      users,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page * limit < total,
+      },
+    });
+  } catch (error) {
+    console.error('ユーザー一覧取得エラー:', error);
+    res.status(500).json({ error: 'ユーザー一覧の取得に失敗しました' });
+  }
+};
+
+// ========================================
+// アカウント削除
+// DELETE /users/:id
+// ========================================
+// 自分のアカウントのみ削除可能。
+// 関連データ（フォロー関係・メッセージ・プロフィール画像）を一括削除します。
+exports.deleteAccount = async (req, res) => {
+  try {
+    const targetId    = req.params.id;
+    const currentUserId = req.user.id;
+
+    // 自分のアカウントのみ削除可能
+    if (targetId !== currentUserId) {
+      return res.status(403).json({ error: '他のユーザーのアカウントは削除できません' });
+    }
+
+    const user = await User.findById(currentUserId);
+    if (!user) {
+      return res.status(404).json({ error: 'ユーザーが見つかりません' });
+    }
+
+    // プロフィール画像の物理削除
+    if (user.profileImage) {
+      try { await fs.unlink(user.profileImage); } catch (_) {}
+    }
+
+    // 自分が送信した音声ファイルの物理削除
+    const sentMessages = await Message.find({ sender: currentUserId, filePath: { $ne: null } });
+    for (const msg of sentMessages) {
+      try { await fs.unlink(msg.filePath); } catch (_) {}
+    }
+
+    // 関連データを並行削除
+    await Promise.all([
+      Follower.deleteMany({ $or: [{ user: currentUserId }, { follower: currentUserId }] }),
+      Message.deleteMany({ $or: [{ sender: currentUserId }, { 'receivers': currentUserId }] }),
+    ]);
+
+    // フォロワー/フォロー数のカウント補正
+    // 自分をフォローしていた人の followingCount を -1
+    // 自分がフォローしていた人の followersCount を -1
+    const [myFollowers, myFollowing] = await Promise.all([
+      Follower.find({ user: currentUserId }).select('follower'),
+      Follower.find({ follower: currentUserId }).select('user'),
+    ]);
+    const followerIds = myFollowers.map(f => f.follower);
+    const followingIds = myFollowing.map(f => f.user);
+    await Promise.all([
+      User.updateMany({ _id: { $in: followerIds  } }, { $inc: { followingCount: -1 } }),
+      User.updateMany({ _id: { $in: followingIds } }, { $inc: { followersCount: -1 } }),
+    ]);
+
+    // ユーザー本体を削除
+    await User.findByIdAndDelete(currentUserId);
+
+    res.json({ message: 'アカウントを削除しました' });
+  } catch (error) {
+    console.error('アカウント削除エラー:', error);
+    res.status(500).json({ error: 'アカウントの削除に失敗しました' });
+  }
+};
+
+// ========================================
+// おすすめユーザー取得
+// GET /users/:id/suggestions?limit=10
+// ========================================
+// 「自分がフォローしている人がフォローしているユーザー」を提案。
+// 既にフォロー済み・自分自身は除外します。
+exports.getUserSuggestions = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const limit  = Math.min(20, parseInt(req.query.limit) || 10);
+
+    // 自分がフォローしている人のIDリスト
+    const myFollowing = await Follower.find({ follower: userId }).select('user');
+    const followingIds = myFollowing.map(f => f.user.toString());
+
+    // フォロー中の人がフォローしている人のIDリスト
+    const secondDegree = await Follower.find({
+      follower: { $in: followingIds },
+      user:     { $nin: [...followingIds, userId] }, // 既フォロー・自分を除外
+    }).distinct('user');
+
+    let suggestions = await User.find({ _id: { $in: secondDegree } })
+      .select('username handle profileImage bio followersCount followingCount')
+      .sort({ followersCount: -1 })
+      .limit(limit);
+
+    // 2nd-degree が足りない場合はフォロワー数が多い人で補完
+    if (suggestions.length < limit) {
+      const excludeIds = [...followingIds, userId, ...suggestions.map(u => u._id.toString())];
+      const filler = await User.find({ _id: { $nin: excludeIds } })
+        .select('username handle profileImage bio followersCount followingCount')
+        .sort({ followersCount: -1 })
+        .limit(limit - suggestions.length);
+      suggestions = [...suggestions, ...filler];
+    }
+
+    res.json(suggestions);
+  } catch (error) {
+    console.error('おすすめユーザー取得エラー:', error);
+    res.status(500).json({ error: 'おすすめユーザーの取得に失敗しました' });
+  }
+};
 
 // ========================================
 // ユーザー検索
