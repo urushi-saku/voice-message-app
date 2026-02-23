@@ -44,4 +44,32 @@ router.get('/me', protect, authController.getMe);
  */
 router.put('/fcm-token', protect, authController.updateFcmToken);
 
+/**
+ * @route   POST /auth/logout
+ * @desc    ログアウト（FCMトークン・リフレッシュトークンをクリア）
+ * @access  Private
+ */
+router.post('/logout', protect, authController.logout);
+
+/**
+ * @route   POST /auth/refresh
+ * @desc    リフレッシュトークンで新しいアクセストークンを発行
+ * @access  Public（リフレッシュトークン必須）
+ */
+router.post('/refresh', authController.refresh);
+
+/**
+ * @route   POST /auth/forgot-password
+ * @desc    パスワードリセット用メールを送信
+ * @access  Public
+ */
+router.post('/forgot-password', authController.forgotPassword);
+
+/**
+ * @route   POST /auth/reset-password/:token
+ * @desc    パスワードリセット確定
+ * @access  Public（リセットトークン必須）
+ */
+router.post('/reset-password/:token', authController.resetPassword);
+
 module.exports = router;

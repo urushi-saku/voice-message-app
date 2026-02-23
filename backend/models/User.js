@@ -94,6 +94,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // リフレッシュトークン（JWT再発行用）
+    refreshToken: {
+      type: String,
+      default: null,
+      select: false, // 通常のクエリには含めない
+    },
+
+    // リフレッシュトークンの有効期限
+    refreshTokenExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    // パスワードリセットトークン（ハッシュ化して保存）
+    resetPasswordToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    // パスワードリセットトークンの有効期限（1時間）
+    resetPasswordExpires: {
+      type: Date,
+      default: null,
+    },
   },
   {
     // タイムスタンプを自動管理

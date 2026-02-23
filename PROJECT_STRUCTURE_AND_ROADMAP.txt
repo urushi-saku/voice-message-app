@@ -3,7 +3,7 @@
 プロジェクト構成と実装ロードマップ
 ================================================================================
 
-更新日: 2026年2月22日
+更新日: 2026年2月23日
 プロジェクト根: /home/xiaox/voice-message-app
 
 【最新状況】
@@ -16,6 +16,7 @@
 フェーズ6（UI/UX改善）: 完了 ✅
 FCM通知タップ時の画面遷移: 完了 ✅
 コードアーキテクチャリファクタリング: 完了 ✅
+認証API拡張（logout / refresh / password-reset）: 完了 ✅
 フェーズ5・7: 未着手
 
 
@@ -896,11 +897,13 @@ voice-message-app/
 
 【認証API】
 ✅ POST   /auth/register          - ユーザー登録
-✅ POST   /auth/login             - ログイン
+✅ POST   /auth/login             - ログイン（refreshToken 発行対応）
 ✅ GET    /auth/me                - 現在のユーザー情報
-⏳ POST   /auth/logout            - ログアウト（未実装）
-⏳ POST   /auth/refresh           - トークンリフレッシュ（未実装）
-⏳ POST   /auth/reset-password    - パスワードリセット（未実装）
+✅ POST   /auth/logout            - ログアウト（FCMトークン・refreshToken クリア）
+✅ POST   /auth/refresh           - アクセストークンリフレッシュ（ローテーション対応）
+✅ POST   /auth/forgot-password   - パスワードリセットメール送信
+✅ POST   /auth/reset-password/:token - パスワードリセット確定
+✅ PUT    /auth/fcm-token         - FCMトークン更新
 
 【ユーザーAPI】
 ✅ GET    /users/search           - ユーザー検索（クエリパラメータ：q）
@@ -971,6 +974,33 @@ voice-message-app/
 ================================================================================
 8. 更新履歴
 ================================================================================
+
+2026-02-23: 認証API拡張（logout / token refresh / password reset）✅
+  - backend/models/User.js 更新
+    ├─ refreshToken フィールド追加（ハッシュ保存・select:false）
+    ├─ refreshTokenExpiresAt フィールド追加
+    ├─ resetPasswordToken フィールド追加（ハッシュ保存・select:false）
+    └─ resetPasswordExpires フィールド追加
+  - backend/controllers/authController.js 更新
+    ├─ nodemailer インポート・メール送信ユーティリティ追加
+    │   └─ SMTP未設定時はコンソール出力（開発時確認用）
+    ├─ generateRefreshToken() / generateAccessToken() ユーティリティ追加
+    ├─ register/login でリフレッシュトークン生成・保存・返却
+    ├─ POST /auth/logout: FCMトークン・refreshToken をDBからクリア
+    ├─ POST /auth/refresh: refreshToken 検証→新アクセストークン発行（ローテーション）
+    ├─ POST /auth/forgot-password: リセットトークン生成・メール送信（1時間有効）
+    └─ POST /auth/reset-password/:token: パスワード更新・全端末ログアウト
+  - backend/routes/auth.js 更新
+    ├─ POST /auth/logout（Private）追加
+    ├─ POST /auth/refresh（Public）追加
+    ├─ POST /auth/forgot-password（Public）追加
+    └─ POST /auth/reset-password/:token（Public）追加
+  - voice_message_app/lib/services/auth_service.dart 更新
+    ├─ register/login: refreshToken を SharedPreferences に保存
+    ├─ logout: POST /auth/logout を先に呼び出し、refreshToken も削除
+    ├─ refreshToken(): refresh API 呼び出し・ローカルトークン更新
+    ├─ forgotPassword(): POST /auth/forgot-password
+    └─ resetPassword(): POST /auth/reset-password/:token
 
 2026-02-21: FCM通知タップ時の画面遷移実装 ✅
   - NavigationService 新規作成（navigation_service.dart）

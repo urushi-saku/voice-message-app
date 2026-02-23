@@ -126,7 +126,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.jumpTo(0);
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -144,9 +144,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('送信失敗: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('送信失敗: ${e.toString()}')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -202,6 +202,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       onWillPop: () async => true,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
+        resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(),
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -321,8 +322,13 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     }
     return Column(
       children: [
-        Expanded(child: _buildMessageList()),
-        _buildInputArea(),
+        Expanded(child: RepaintBoundary(child: _buildMessageList())),
+        _InputBar(
+          textController: _textController,
+          isSending: _isSending,
+          onMicTap: _openRecording,
+          onSend: _sendText,
+        ),
       ],
     );
   }
@@ -338,15 +344,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
           ? const Center(child: Text('まだメッセージはありません'))
           : ListView.builder(
               controller: _scrollController,
-              reverse: true,
               padding: const EdgeInsets.symmetric(vertical: 8),
+              cacheExtent: 500,
               itemCount: messages.length,
               itemBuilder: (_, i) {
-                final idx = messages.length - 1 - i;
-                final message = messages[idx];
+                final message = messages[i];
                 return MessageBubble(
                   message: message,
-                  index: idx,
+                  index: i,
                   displayName: _displayName,
                   displayProfileImage: _displayProfileImage,
                   onLongPress: () => showMessageOptionsSheet(
@@ -365,108 +370,136 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
             ),
     );
   }
+}
 
-  // ========================================
-  // 入力エリア
-  // ========================================
-  Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // マイクボタン
-            Material(
-              color: const Color(0xFFEDE7F6),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: _openRecording,
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(Icons.mic, color: Color(0xFF7C4DFF), size: 22),
-                ),
-              ),
+// ========================================
+// 入力バー（独立 Widget）
+// ========================================
+// MediaQuery.viewInsetsOf をこの Widget のみで消費することで、
+// キーボードアニメーション中の rebuild をこのサブツリーだけに限定し
+// ListView（メッセージリスト）の rebuild を防ぐ。
+class _InputBar extends StatelessWidget {
+  final TextEditingController textController;
+  final bool isSending;
+  final VoidCallback onMicTap;
+  final VoidCallback onSend;
+
+  const _InputBar({
+    required this.textController,
+    required this.isSending,
+    required this.onMicTap,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // ここだけが viewInsets / padding に依存する → キーボード展開中は
+    // この Widget のみが毎フレーム rebuild される
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    // padding.bottom = ナビゲーションバー高さ（キーボード表示中は 0 に縮む）
+    // → 両方足すことで「キーボードなし時はNavBar分・表示時はキーボード分」になる
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset + bottomPadding),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
             ),
-            const SizedBox(width: 8),
-            // テキスト入力フィールド
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F7FA),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: TextField(
-                  controller: _textController,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.newline,
-                  decoration: const InputDecoration(
-                    hintText: 'メッセージを入力',
-                    hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    border: InputBorder.none,
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          bottom: false, // 手動で bottomInset + bottomPadding を適用済み
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // マイクボタン
+              Material(
+                color: const Color(0xFFEDE7F6),
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onMicTap,
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Icon(Icons.mic, color: Color(0xFF7C4DFF), size: 22),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // 送信ボタン
-            _isSending
-                ? const SizedBox(
-                    width: 42,
-                    height: 42,
-                    child: Padding(
-                      padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF7C4DFF),
+              const SizedBox(width: 8),
+              // テキスト入力フィールド
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F7FA),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: TextField(
+                    controller: textController,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    decoration: const InputDecoration(
+                      hintText: 'メッセージを入力',
+                      hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
+                      border: InputBorder.none,
                     ),
-                  )
-                : GestureDetector(
-                    onTap: _sendText,
-                    child: Container(
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 送信ボタン
+              isSending
+                  ? const SizedBox(
                       width: 42,
                       height: 42,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+                      child: Padding(
+                        padding: EdgeInsets.all(10),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF7C4DFF),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x407C4DFF),
-                            blurRadius: 8,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
                       ),
-                      child: const Icon(
-                        Icons.send_rounded,
-                        color: Colors.white,
-                        size: 20,
+                    )
+                  : GestureDetector(
+                      onTap: onSend,
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x407C4DFF),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.send_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -87,6 +87,10 @@ class AuthService {
         // 将来的なAPI呼び出しで認証ヘッダーとして使用
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('authToken', data['data']['token']);
+        // リフレッシュトークンも保存
+        if (data['data']['refreshToken'] != null) {
+          await prefs.setString('refreshToken', data['data']['refreshToken']);
+        }
 
         // ④ ユーザー情報を返す
         return data['data'];
@@ -146,6 +150,10 @@ class AuthService {
         // ③ トークンをローカルストレージに保存
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('authToken', data['data']['token']);
+        // リフレッシュトークンも保存
+        if (data['data']['refreshToken'] != null) {
+          await prefs.setString('refreshToken', data['data']['refreshToken']);
+        }
 
         // ④ ユーザー情報を返す
         return data['data'];
@@ -165,19 +173,34 @@ class AuthService {
   // ========================================
   // ログアウト
   // ========================================
-  /// ユーザーをログアウトする（トークンを削除）
+  /// ユーザーをログアウトする（サーバー・ローカル両方のトークンを削除）
   ///
   /// 【処理フロー】
-  /// ①FCMトークンをサーバーから削除
-  /// ②ローカルストレージから認証トークンを削除
+  /// ①サーバーに POST /auth/logout を送信・FCMトークン・refreshTokenがクリアされる
+  /// ②ローカルストレージから認証トークン・リフレッシュトークンを削除
   static Future<void> logout() async {
     try {
-      // ①FCMトークンを削除（プッシュ通知を停止）
+      final token = await getToken();
+      // ①サーバーサイドのトークン・FCMトークンをクリア
+      if (token != null) {
+        try {
+          await http.post(
+            Uri.parse('$BASE_URL/auth/logout'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+        } catch (_) {
+          // ネットワークエラーでもローカルのクリアは実行する
+        }
+      }
+      // ②FCMトークンのローカルクリア
       await FcmService.deleteToken();
-
-      // ②認証トークンを削除
+      // ③認証トークン・refreshTokenを消去
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('authToken');
+      await prefs.remove('refreshToken');
     } catch (e) {
       throw e.toString();
     }
@@ -193,6 +216,74 @@ class AuthService {
       return prefs.getString('authToken');
     } catch (e) {
       return null;
+    }
+  }
+
+  // ========================================
+  // トークンリフレッシュ
+  // ========================================
+  /// リフレッシュトークンで新しいアクセストークンを発行する。
+  ///
+  /// アクセストークンが期限切れになったときに呼び出す。
+  /// 成功時は新しいアクセストークン＆リフレッシュトークンを保存する。
+  /// 戻り値 true = 更新成功、false = リフレッシュトークンも無効（再ログイン必要）
+  static Future<bool> refreshToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final storedRefreshToken = prefs.getString('refreshToken');
+      if (storedRefreshToken == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$BASE_URL/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refreshToken': storedRefreshToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await prefs.setString('authToken', data['data']['token']);
+        await prefs.setString('refreshToken', data['data']['refreshToken']);
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ========================================
+  // パスワードリセットリクエスト
+  // ========================================
+  /// メールアドレスにパスワードリセット用メールを送信する。
+  /// SMTP設定がない場合はサーバーコンソールにリセットURLが表示される。
+  static Future<void> forgotPassword(String email) async {
+    final response = await http.post(
+      Uri.parse('$BASE_URL/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw error['message'] ?? 'パスワードリセットのリクエストに失敗しました';
+    }
+  }
+
+  // ========================================
+  // パスワードリセット確定
+  // ========================================
+  /// リセットトークン（URLから取得）と新しいパスワードでパスワードを更新する。
+  static Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$BASE_URL/auth/reset-password/$token'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'password': newPassword}),
+    );
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw error['message'] ?? 'パスワードのリセットに失敗しました';
     }
   }
 

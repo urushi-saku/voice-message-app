@@ -5,7 +5,53 @@
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const User = require('../models/User');
+
+// ========================================
+// ユーティリティ: メール送信
+// ========================================
+const sendEmail = async ({ to, subject, html }) => {
+  // SMTP設定が未設定の場合はコンソールに出力（開発時用）
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
+    console.log('==== [DEV] Email not sent (SMTP unconfigured) ====');
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(html.replace(/<[^>]+>/g, ''));
+    console.log('=================================================');
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Voice Message App" <${process.env.SMTP_USER}>`,
+    to,
+    subject,
+    html,
+  });
+};
+
+// ========================================
+// ユーティリティ: リフレッシュトークン生成
+// ========================================
+const generateRefreshToken = () => crypto.randomBytes(40).toString('hex');
+
+// ========================================
+// ユーティリティ: アクセストークン生成
+// ========================================
+const generateAccessToken = (userId) =>
+  jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+
 
 /**
  * ユーザー登録
@@ -54,8 +100,17 @@ exports.register = async (req, res) => {
     });
 
     // JWTトークンを生成
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '30d', // 30日間有効
+    const token = generateAccessToken(user._id);
+
+    // リフレッシュトークンを生成・保存（30日有効）
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: refreshTokenHash,
+      refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
     res.status(201).json({
@@ -71,6 +126,7 @@ exports.register = async (req, res) => {
           bio: user.bio,
         },
         token,
+        refreshToken,
       },
     });
   } catch (error) {
@@ -118,8 +174,17 @@ exports.login = async (req, res) => {
     }
 
     // JWTトークンを生成
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '30d',
+    const token = generateAccessToken(user._id);
+
+    // リフレッシュトークンを生成・保存（30日有効）
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: refreshTokenHash,
+      refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
     res.status(200).json({
@@ -135,6 +200,7 @@ exports.login = async (req, res) => {
           followingCount: user.followingCount,
         },
         token,
+        refreshToken,
       },
     });
   } catch (error) {
@@ -223,6 +289,258 @@ exports.updateFcmToken = async (req, res) => {
     });
   } catch (error) {
     console.error('FCMトークン更新エラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'サーバーエラーが発生しました',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * ログアウト
+ * POST /auth/logout
+ *
+ * FCMトークンとリフレッシュトークンをDBから削除する。
+ * JWTアクセストークン自体はステートレスなのでサーバー側では無効化できないが、
+ * リフレッシュトークンを削除することで再発行を防ぐ。
+ * クライアント側では受け取り後に保存済みトークンを削除すること。
+ */
+exports.logout = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user.id, {
+      fcmToken: null,
+      refreshToken: null,
+      refreshTokenExpiresAt: null,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'ログアウトしました',
+    });
+  } catch (error) {
+    console.error('ログアウトエラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'サーバーエラーが発生しました',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * トークンリフレッシュ
+ * POST /auth/refresh
+ *
+ * リフレッシュトークンを検証して新しいアクセストークンを発行する。
+ * 同時にリフレッシュトークンを更新（ローテーション）することで、
+ * 盗まれたリフレッシュトークンの再利用を防ぐ。
+ */
+exports.refresh = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'リフレッシュトークンは必須です',
+      });
+    }
+
+    // 受け取ったトークンをハッシュ化してDBと照合
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    const user = await User.findOne({
+      refreshToken: tokenHash,
+      refreshTokenExpiresAt: { $gt: new Date() },
+    }).select('+refreshToken');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'リフレッシュトークンが無効または期限切れです',
+      });
+    }
+
+    // 新しいアクセストークンを発行
+    const newAccessToken = generateAccessToken(user._id);
+
+    // リフレッシュトークンをローテーション（旧トークンを無効化）
+    const newRefreshToken = generateRefreshToken();
+    const newRefreshHash = crypto
+      .createHash('sha256')
+      .update(newRefreshToken)
+      .digest('hex');
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: newRefreshHash,
+      refreshTokenExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'トークンを更新しました',
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+      },
+    });
+  } catch (error) {
+    console.error('トークンリフレッシュエラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'サーバーエラーが発生しました',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * パスワードリセットリクエスト
+ * POST /auth/forgot-password
+ *
+ * メールアドレスからリセット用URLを生成してメール送信する。
+ * SMTP設定がない場合はコンソールにURLを出力（開発時確認用）。
+ */
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'メールアドレスは必須です',
+      });
+    }
+
+    // メールアドレスからユーザーを検索
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+
+    // ユーザーが見つからなくても同じレスポンスを返す（ユーザー列挙攻撃対策）
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message:
+          '該当するメールアドレスが登録されている場合、リセット用メールを送信しました',
+      });
+    }
+
+    // リセットトークン生成（URLに含めるのは平文、DBにはハッシュを保存）
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // トークンをDBに保存（1時間有効）
+    await User.findByIdAndUpdate(user._id, {
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpires: new Date(Date.now() + 60 * 60 * 1000),
+    });
+
+    // リセットURL生成（フロントエンドのURLに合わせて変更すること）
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: 'パスワードリセットのご案内',
+      html: `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2>パスワードリセット</h2>
+          <p>${user.username} さん、こんにちは。</p>
+          <p>以下のボタンからパスワードをリセットしてください。</p>
+          <p>このリンクは <strong>1時間</strong> 有効です。</p>
+          <a href="${resetUrl}"
+             style="display:inline-block;padding:12px 24px;background:#7C4DFF;color:#fff;
+                    text-decoration:none;border-radius:8px;margin:16px 0;">
+            パスワードをリセット
+          </a>
+          <p style="color:#888;font-size:12px;">
+            このメールに心当たりがない場合は無視してください。
+          </p>
+        </div>
+      `,
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        '該当するメールアドレスが登録されている場合、リセット用メールを送信しました',
+    });
+  } catch (error) {
+    console.error('パスワードリセットリクエストエラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'サーバーエラーが発生しました',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * パスワードリセット確定
+ * POST /auth/reset-password/:token
+ *
+ * URLのトークンを検証し、新しいパスワードに更新する。
+ */
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: '新しいパスワードを入力してください',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'パスワードは6文字以上で設定してください',
+      });
+    }
+
+    // URLのトークンをハッシュ化してDBと照合
+    const tokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const user = await User.findOne({
+      resetPasswordToken: tokenHash,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken');
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'パスワードリセットトークンが無効または期限切れです。再度リクエストしてください',
+      });
+    }
+
+    // パスワードをハッシュ化して更新
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    await User.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+      // リフレッシュトークンも無効化（全端末からログアウト）
+      refreshToken: null,
+      refreshTokenExpiresAt: null,
+    });
+
+    res.status(200).json({
+      success: true,
+      message:
+        'パスワードをリセットしました。新しいパスワードでログインしてください',
+    });
+  } catch (error) {
+    console.error('パスワードリセットエラー:', error);
     res.status(500).json({
       success: false,
       message: 'サーバーエラーが発生しました',
