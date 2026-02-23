@@ -14,10 +14,14 @@ const cors = require('cors');                // CORS対応
 const path = require('path');                // ファイルパスを操作するためのモジュール
 const fs = require('fs');                    // ファイル操作を行うためのモジュール
 const rateLimit = require('express-rate-limit'); // レート制限
+const helmet = require('helmet');                // セキュリティヘッダー (HSTS 等)
 const connectDB = require('./config/database'); // データベース接続
 
 const app = express();                       // Expressアプリケーションを作成
 const PORT = process.env.PORT || 3000;       // サーバーが待機するポート番号
+
+// リバースプロキシ（nginx / AWS ELB / GCP LB 等）の X-Forwarded-Proto を信頼
+app.set('trust proxy', 1);
 
 // ========================================
 // データベース接続
@@ -27,6 +31,36 @@ connectDB();
 // ========================================
 // ミドルウェア設定
 // ========================================
+
+// ========================================
+// HTTPS/TLS 強制リダイレクト（本番環境のみ）
+// ========================================
+// HTTP でアクセスされた場合 301 で HTTPS へリダイレクト
+// X-Forwarded-Proto ヘッダーを使用（リバースプロキシ対応）
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    const proto = req.headers['x-forwarded-proto'];
+    if (req.secure || proto === 'https') {
+      return next();
+    }
+    return res.redirect(301, `https://${req.headers.host}${req.url}`);
+  });
+}
+
+// ========================================
+// セキュリティヘッダー（helmet）
+// ========================================
+// - Strict-Transport-Security (HSTS): ブラウザに1年間 HTTPS を強制
+// - X-Content-Type-Options, X-Frame-Options 等の標準セキュリティヘッダー
+app.use(helmet({
+  hsts: {
+    maxAge: 31536000,        // 1年（秒）
+    includeSubDomains: true, // サブドメインにも適用
+    preload: true,           // HSTS Preload リストへの登録を許可
+  },
+  contentSecurityPolicy: false, // REST API サーバーのため CSP は不要
+}));
+
 // JSON形式のリクエストボディをパース
 app.use(express.json());
 // URLエンコードされたデータをパース

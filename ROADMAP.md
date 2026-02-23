@@ -235,7 +235,7 @@ voice-message-app/
 
 - [x] エンドツーエンド暗号化（X25519 DH + ChaCha20-Poly1305）
 - [x] レート制限（express-rate-limit）
-- [ ] HTTPS/TLS 強制
+- [x] HTTPS/TLS 強制
 - [ ] Sentry によるエラーモニタリング
 - [ ] APIレスポンスキャッシング（Redis）
 
@@ -272,6 +272,14 @@ voice-message-app/
 ---
 
 ## 更新履歴
+
+### 2026-02-23
+- HTTPS/TLS 強制実装
+  - Backend: `helmet` パッケージ導入
+  - HSTS（HTTP Strict Transport Security）: `maxAge=31536000`（1年）`includeSubDomains` `preload` 指定
+  - 本番環境（`NODE_ENV=production`）で HTTP → HTTPS へ 301 リダイレクト（`X-Forwarded-Proto` 対応）
+  - `app.set('trust proxy', 1)` で nginx / AWS ELB 等のリバースプロキシ対応
+  - helmet 標準ヘッダー: `X-Content-Type-Options` `X-Frame-Options` `X-DNS-Prefetch-Control` 等
 
 ### 2026-02-23
 - レート制限実装（express-rate-limit）
