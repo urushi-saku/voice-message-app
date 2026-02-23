@@ -234,7 +234,7 @@ voice-message-app/
 ### Phase 5 — セキュリティ・パフォーマンス
 
 - [x] エンドツーエンド暗号化（X25519 DH + ChaCha20-Poly1305）
-- [ ] レート制限（express-rate-limit）
+- [x] レート制限（express-rate-limit）
 - [ ] HTTPS/TLS 強制
 - [ ] Sentry によるエラーモニタリング
 - [ ] APIレスポンスキャッシング（Redis）
@@ -272,6 +272,14 @@ voice-message-app/
 ---
 
 ## 更新履歴
+
+### 2026-02-23
+- レート制限実装（express-rate-limit）
+  - Backend: `express-rate-limit` パッケージ導入
+  - 全体制限: 1IP あたり 15 分間 500 リクエスト（DDoS・スクレイピング対策）
+  - 認証制限: 1IP あたり 15 分間 20 リクエスト（ブルートフォース対策、全 `/auth` ルートに適用）
+  - 送信制限: 1IP あたり 1 分間 30 リクエスト（スパム対策、`/messages/send` `/messages/send-text` に適用）
+  - テスト環境ではすべてのレート制限を自動スキップ（`NODE_ENV=test`）
 
 ### 2026-02-23
 - E2EE（エンドツーエンド暗号化）実装

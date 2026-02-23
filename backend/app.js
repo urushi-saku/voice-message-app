@@ -13,6 +13,7 @@ const express = require('express');          // Webサーバーを作るため�
 const cors = require('cors');                // CORS対応
 const path = require('path');                // ファイルパスを操作するためのモジュール
 const fs = require('fs');                    // ファイル操作を行うためのモジュール
+const rateLimit = require('express-rate-limit'); // レート制限
 const connectDB = require('./config/database'); // データベース接続
 
 const app = express();                       // Expressアプリケーションを作成
@@ -34,12 +35,51 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
 // ========================================
+// レート制限
+// ========================================
+// 【全体】全APIに対する基本制限（DDoS・スクレイピング対策）
+// 1 IP につき 15 分間で 500 リクエストまで
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分
+  max: 500,
+  standardHeaders: true,    // RateLimit-* ヘッダーを返す
+  legacyHeaders: false,
+  message: { error: 'リクエストが多すぎます。しばらく待ってから再試行してください。' },
+  skip: () => process.env.NODE_ENV === 'test', // テスト時は無効
+});
+app.use(globalLimiter);
+
+// 【認証】ブルートフォース対策
+// 1 IP につき 15 分間で 20 リクエストまで（login / register / パスワードリセット）
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '認証リクエストが多すぎます。15分後に再試行してください。' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+// 【メッセージ送信】スパム対策
+// 1 IP につき 1 分間で 30 リクエストまで
+const messageSendLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1分
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'メッセージ送信が多すぎます。しばらく待ってから再試行してください。' },
+  skip: () => process.env.NODE_ENV === 'test',
+});
+
+// ========================================
 // ルーティング
 // ========================================
-// 認証関連のルート
-app.use('/auth', require('./routes/auth'));
+// 認証関連のルート（ブルートフォース対策: 15分で20回まで）
+app.use('/auth', authLimiter, require('./routes/auth'));
 // ユーザー関連のルート
 app.use('/users', require('./routes/user'));
+// メッセージ送信エンドポイント専用のスパム対策（1分で30回まで）
+app.use(['/messages/send', '/messages/send-text'], messageSendLimiter);
 // メッセージ関連のルート
 app.use('/messages', require('./routes/message'));
 // 通知関連のルート
