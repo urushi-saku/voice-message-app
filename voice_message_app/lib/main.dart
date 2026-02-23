@@ -57,7 +57,10 @@ import 'firebase_options.dart';
 // Sentry DSN はビルド時に --dart-define=SENTRY_DSN=... で注入
 // 例: flutter run --dart-define=SENTRY_DSN=https://xxx@oyyy.ingest.sentry.io/zzz
 // 未指定の場合は Sentry は自動的に無効化される
-const String _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+const String _sentryDsn = String.fromEnvironment(
+  'SENTRY_DSN',
+  defaultValue: '',
+);
 
 void main() async {
   await SentryFlutter.init(
