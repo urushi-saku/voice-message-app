@@ -14,12 +14,18 @@ const messageSchema = new mongoose.Schema(
       required: true,
     },
 
+    // 宛先グループ（グループメッセージの場合）
+    group: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Group',
+      default: null,
+    },
+
     // 受信者（複数可能）
     receivers: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
       },
     ],
 
@@ -124,6 +130,7 @@ const messageSchema = new mongoose.Schema(
 // インデックス（検索性能向上）
 messageSchema.index({ sender: 1, sentAt: -1 });
 messageSchema.index({ receivers: 1, sentAt: -1 });
+messageSchema.index({ group: 1, sentAt: -1 });
 messageSchema.index({ sentAt: -1 });
 
 const Message = mongoose.model('Message', messageSchema);

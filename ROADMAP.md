@@ -19,6 +19,7 @@
 | API拡張 | 認証・ユーザー・メッセージ・通知 | ✅ 完了 |
 | Phase 5 | セキュリティ・パフォーマンス | ⏳ 未着手 |
 | Phase 7 | テスト・デプロイメント | ⏳ 未着手 |
+| 拡張機能 | グループメッセージング | ✅ 完了 |
 
 ---
 
@@ -78,6 +79,22 @@
 | PATCH  | `/notifications/:id/read` | 個別既読 | ✅ |
 | PATCH  | `/notifications/read-all` | 全通知既読 | ✅ |
 
+### グループ
+
+| メソッド | パス | 説明 | 状態 |
+|---|---|---|---|
+| GET    | `/groups` | 自分が参加しているグループ一覧（最新メッセージ・未読数付き） | ✅ |
+| POST   | `/groups` | グループ作成（名前・説明・メンバー・アイコン） | ✅ |
+| GET    | `/groups/:id` | グループ詳細 | ✅ |
+| PUT    | `/groups/:id` | グループ情報更新（管理者のみ） | ✅ |
+| DELETE | `/groups/:id` | グループ削除（管理者のみ・メッセージ・ファイルも削除） | ✅ |
+| POST   | `/groups/:id/members` | メンバー追加（管理者のみ） | ✅ |
+| DELETE | `/groups/:id/members/:userId` | メンバー削除 / 退出 | ✅ |
+| GET    | `/groups/:id/messages` | グループメッセージ一覧（ページング） | ✅ |
+| POST   | `/groups/:id/messages/text` | グループテキストメッセージ送信 | ✅ |
+| POST   | `/groups/:id/messages/voice` | グループ音声メッセージ送信 | ✅ |
+| PUT    | `/groups/:id/messages/:messageId/read` | グループメッセージ既読 | ✅ |
+
 ---
 
 ## ファイル構成
@@ -98,12 +115,20 @@ voice-message-app/
 │   │   ├── authController.js           # 登録・ログイン・ログアウト・refresh・パスワードリセット
 │   │   ├── userController.js           # ユーザー一覧/詳細・フォロー・プロフィール編集・アカウント削除
 │   │   ├── messageController.js        # メッセージ送受信・検索・スレッド・既読・削除・ダウンロード
-│   │   └── notificationController.js   # 通知一覧・送信・削除・既読操作
+│   │   ├── notificationController.js   # 通知一覧・送信・削除・既読操作
+│   │   └── groupController.js          # グループCRUD・メンバー管理・グループメッセージ
 │   ├── routes/                         # Express ルーター（URLマッピング）
 │   │   ├── auth.js                     # /auth/*
 │   │   ├── user.js                     # /users/*
 │   │   ├── message.js                  # /messages/*
-│   │   └── notification.js             # /notifications/*
+│   │   ├── notification.js             # /notifications/*
+│   │   └── group.js                    # /groups/*
+│   ├── models/                         # Mongoose スキーマ定義
+│   │   ├── User.js                     # ユーザー（認証情報・プロフィール・FCMトークン・refreshToken）
+│   │   ├── Follower.js                 # フォロー関係（user ↔ follower の対）
+│   │   ├── Message.js                  # メッセージ（音声/テキスト・既読状態・論理削除・グループ参照）
+│   │   ├── Notification.js             # 通知（follow/message/system・既読管理）
+│   │   └── Group.js                    # グループ（名前・説明・管理者・メンバー）
 │   ├── middleware/
 │   │   └── auth.js                     # JWT 検証ミドルウェア（protect）
 │   └── uploads/                        # アップロードファイル保存先
@@ -178,6 +203,7 @@ voice-message-app/
 - プロフィール表示・編集・画像アップロード
 - 設定画面（録音品質・ダークモード）
 - オフラインモード（Hive キャッシュ・自動同期）
+- グループメッセージング（作成・メンバー管理・テキスト/ボイス送受信・未読管理）
 - FCM プッシュ通知・通知タップ画面遷移
 - ダークモード / ライトモード
 - アニメーション・アクセシビリティ・レスポンシブ対応
@@ -191,6 +217,7 @@ voice-message-app/
 - ファイルアップロード（音声 10MB・画像 5MB、multer）
 - 論理削除・アカウント削除時のファイル物理削除
 - 通知モデル（follow / message / system）
+- グループメッセージング（グループCRUD・メンバー管理・テキスト/ボイス送信・FCM通知）
 
 ---
 
@@ -215,7 +242,7 @@ voice-message-app/
 
 ### 拡張機能（優先度低）
 
-- [ ] グループメッセージング
+- [x] グループメッセージング
 - [ ] メッセージへのリアクション（絵文字）
 - [ ] Web バージョン
 
@@ -240,7 +267,15 @@ voice-message-app/
 ## 更新履歴
 
 ### 2026-02-23
-- 旧ファイルAPI削除（`POST /upload`, `GET /voices`, `GET /voice/:filename`）
+- グループメッセージング実装
+  - Backend: `Group` モデル・`groupController.js`・`routes/group.js` 追加
+  - Backend: `Message` モデルに `group` フィールド追加
+  - Flutter: `Group` / `GroupMember` / `GroupMessageInfo` モデル追加
+  - Flutter: `GroupService` 追加（グループCRUD・メンバー管理・テキスト/ボイス送信）
+  - Flutter: `GroupListScreen` / `GroupChatScreen` / `GroupMembersScreen` / `CreateGroupScreen` 追加
+  - Flutter: `home_page.dart` にグループタブ追加（4タブ構成）
+
+### 2026-02-23（`POST /upload`, `GET /voices`, `GET /voice/:filename`）
 - 通知API実装（`Notification` モデル・コントローラー・ルート・Flutter サービス）
 - `GET /messages/:id` メッセージ詳細API実装
 - おすすめユーザー機能削除

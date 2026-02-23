@@ -44,6 +44,8 @@ app.use('/users', require('./routes/user'));
 app.use('/messages', require('./routes/message'));
 // 通知関連のルート
 app.use('/notifications', require('./routes/notification'));
+// グループ関連のルート
+app.use('/groups', require('./routes/group'));
 
 // ========================================
 // uploadsディレクトリの確保（messages APIが使用）
@@ -51,6 +53,11 @@ app.use('/notifications', require('./routes/notification'));
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
+}
+
+const groupUploadDir = path.join(__dirname, 'uploads', 'groups');
+if (!fs.existsSync(groupUploadDir)) {
+  fs.mkdirSync(groupUploadDir, { recursive: true });
 }
 
 // ========================================

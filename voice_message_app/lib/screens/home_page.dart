@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'profile_page.dart';
 import 'message_threads_screen.dart';
 import 'voice_card_screen.dart';
+import 'group_list_screen.dart';
 
 /// ホームページウィジェット（タブナビゲーション）
 class HomePage extends StatefulWidget {
@@ -22,7 +23,7 @@ class _HomePageState extends State<HomePage> {
   // ========================================
   // タブの状態管理
   // ========================================
-  int _currentTabIndex = 0; // 現在選択中のタブ（0=メッセージ, 1=ボイスカード, 2=プロフィール）
+  int _currentTabIndex = 0; // 現在選択中のタブ（0=メッセージ, 1=グループ, 2=ボイスカード, 3=プロフィール）
 
   // ========================================
   // 各タブの内容を返す
@@ -32,8 +33,10 @@ class _HomePageState extends State<HomePage> {
       case 0:
         return const MessageThreadsScreen(); // メッセージスレッド一覧
       case 1:
-        return const VoiceCardScreen(); // ボイスカード
+        return const GroupListScreen(); // グループ一覧
       case 2:
+        return const VoiceCardScreen(); // ボイスカード
+      case 3:
         return const ProfilePage(); // プロフィールタブ
       default:
         return const MessageThreadsScreen();
@@ -68,6 +71,11 @@ class _HomePageState extends State<HomePage> {
         elevation: 8,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.forum), label: 'メッセージ'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.group_outlined),
+            activeIcon: Icon(Icons.group),
+            label: 'グループ',
+          ),
           BottomNavigationBarItem(
             icon: Icon(Icons.photo_library_outlined),
             activeIcon: Icon(Icons.photo_library),
