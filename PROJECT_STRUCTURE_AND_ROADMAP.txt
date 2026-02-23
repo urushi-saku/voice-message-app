@@ -913,7 +913,8 @@ voice-message-app/
 ✅ GET    /users/:id/followers    - フォロワー一覧
 ✅ GET    /users/:id/following    - フォロー中一覧
 ✅ DELETE /users/:id              - アカウント削除（自分のみ・関連データ一括削除）
-⏳ PUT    /users/:id              - プロフィール更新（/users/profile を使用）
+✅ PUT    /users/profile          - プロフィール更新（username / handle / bio）
+✅ PUT    /users/profile/image   - プロフィール画像更新
 
 【フォロー関連API】
 ✅ POST   /users/:id/follow       - フォロー
