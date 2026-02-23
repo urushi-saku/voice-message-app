@@ -937,9 +937,11 @@ voice-message-app/
 ⏳ DELETE /voice/:filename         - ファイル削除（未実装）
 
 【通知API】
-⏳ POST   /notifications           - 通知送信（未実装）
-⏳ GET    /notifications           - 通知一覧（未実装）
-⏳ DELETE /notifications/:id       - 通知削除（未実装）
+✅ GET    /notifications           - 通知一覧（ページング・未読フィルター・未読数付き）
+✅ POST   /notifications           - 通知送信
+✅ DELETE /notifications/:id       - 通知削除
+✅ PATCH  /notifications/:id/read  - 通知を既読にする
+✅ PATCH  /notifications/read-all  - 全通知を既読にする
 
 
 ================================================================================
@@ -974,6 +976,24 @@ voice-message-app/
 ================================================================================
 8. 更新履歴
 ================================================================================
+
+2026-02-23: 通知API実装 ✅
+  - backend/models/Notification.js 新規作成
+    └─ recipient / sender / type / content / relatedId / isRead / readAt フィールド
+  - backend/controllers/notificationController.js 新規作成
+    ├─ GET  /notifications: ページング・未読フィルター・未読数返却
+    ├─ POST /notifications: 通知送信（自分自身への送信不可）
+    ├─ DELETE /notifications/:id: 自分宛て通知のみ削除可
+    ├─ PATCH /notifications/:id/read: 個別既読
+    └─ PATCH /notifications/read-all: 全既読
+  - backend/routes/notification.js 新規作成
+  - backend/app.js 更新（/notifications ルート追加）
+  - voice_message_app/lib/services/notification_service.dart 新規作成
+    ├─ getNotifications(): 一覧取得
+    ├─ sendNotification(): 通知送信
+    ├─ deleteNotification(): 削除
+    ├─ markAsRead(): 個別既読
+    └─ markAllAsRead(): 全既読
 
 2026-02-23: メッセージAPI拡張 ✅
   - backend/controllers/messageController.js 追加

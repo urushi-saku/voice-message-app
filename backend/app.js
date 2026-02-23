@@ -43,6 +43,8 @@ app.use('/auth', require('./routes/auth'));
 app.use('/users', require('./routes/user'));
 // メッセージ関連のルート
 app.use('/messages', require('./routes/message'));
+// 通知関連のルート
+app.use('/notifications', require('./routes/notification'));
 
 // ========================================
 // ファイル保存設定
