@@ -17,6 +17,7 @@
     "testTimeout": 30000
   },
   "dependencies": {
+    "@sentry/node": "^10.39.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",

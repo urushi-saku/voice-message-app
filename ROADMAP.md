@@ -236,7 +236,7 @@ voice-message-app/
 - [x] エンドツーエンド暗号化（X25519 DH + ChaCha20-Poly1305）
 - [x] レート制限（express-rate-limit）
 - [x] HTTPS/TLS 強制
-- [ ] Sentry によるエラーモニタリング
+- [x] Sentry によるエラーモニタリング
 - [ ] APIレスポンスキャッシング（Redis）
 
 ### Phase 7 — テスト・デプロイメント
@@ -272,6 +272,19 @@ voice-message-app/
 ---
 
 ## 更新履歴
+
+### 2026-02-23
+- Sentry エラーモニタリング実装
+  - Backend: `@sentry/node` v10 パッケージ導入
+  - `Sentry.init()` を `dotenv.config()` 直後に配置（全モジュールロード前に初期化）
+  - `Sentry.setupExpressErrorHandler(app)` でルートの例外を自動キャプチャ
+  - `uncaughtException` / `unhandledRejection` のハンドラーで `Sentry.captureException()` を呼び出し
+  - `SENTRY_DSN` 未設定時は `enabled: false` でローカル開発に影響なし
+  - トランザクションサンプリング率: 本番 10% / 開発 100%
+  - Flutter: `sentry_flutter: ^8.0.0` 導入
+  - Flutter: `SentryFlutter.init()` で `runApp` をラップ（未処理例外を自動キャプチャ）
+  - Flutter: `SentryNavigatorObserver` で画面遷移をトラッキング
+  - DSN はビルド時に `--dart-define=SENTRY_DSN=...` / 環境変数 `SENTRY_DSN` で注入
 
 ### 2026-02-23
 - HTTPS/TLS 強制実装

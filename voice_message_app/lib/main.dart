@@ -17,6 +17,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/home_page.dart';
@@ -53,13 +54,28 @@ import 'firebase_options.dart';
 /// await Firebase.initializeApp(
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
-void main() {
-  // Flutter Widgetの初期化のみ（同期処理・一瞬）
-  WidgetsFlutterBinding.ensureInitialized();
+// Sentry DSN はビルド時に --dart-define=SENTRY_DSN=... で注入
+// 例: flutter run --dart-define=SENTRY_DSN=https://xxx@oyyy.ingest.sentry.io/zzz
+// 未指定の場合は Sentry は自動的に無効化される
+const String _sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
 
-  // 即座にアプリを起動してスプラッシュ画面を表示
-  // 全初期化はSplashScreen内でバックグラウンド実行
-  runApp(const MyApp());
+void main() async {
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = _sentryDsn;
+      options.environment = const String.fromEnvironment(
+        'APP_ENV',
+        defaultValue: 'development',
+      );
+      // トランザクションサンプリング率: 未処理例外・パフォーマンス計測の 100% を送信
+      options.tracesSampleRate = 1.0;
+      // DSN が空の場合 Sentry は自動的に no-op (何も送信しない)
+    },
+    appRunner: () {
+      // Flutter Widgetの初期化は SentryFlutter.init 内で完了済み
+      runApp(const MyApp());
+    },
+  );
 }
 
 // ========================================
@@ -94,6 +110,9 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'ボイスメッセージアプリ',
             navigatorKey: NavigationService.navigatorKey,
+            navigatorObservers: [
+              SentryNavigatorObserver(), // 画面遷移を Sentry でトラッキング
+            ],
             theme: lightTheme(),
             darkTheme: darkTheme(),
             themeMode: themeProvider.isDarkMode

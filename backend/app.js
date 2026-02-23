@@ -8,6 +8,20 @@
 // 環境変数の読み込み（最初に実行）
 require('dotenv').config();
 
+// ========================================
+// Sentry 初期化（最初に実行 — 全モジュールロード前）
+// ========================================
+// DSN が未設定のままでも enabled:false で安全に無効化される
+const Sentry = require('@sentry/node');
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || '',
+  environment: process.env.NODE_ENV || 'development',
+  // トランザクションのサンプリング率（本番: 10%, 開発: 100%）
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  // DSN が未設定（ローカル開発）の場合は Sentry を無効化
+  enabled: !!process.env.SENTRY_DSN,
+});
+
 // 必要なモジュール（Node.jsの機能）をインポート
 const express = require('express');          // Webサーバーを作るためのフレームワーク
 const cors = require('cors');                // CORS対応
@@ -122,6 +136,12 @@ app.use('/notifications', require('./routes/notification'));
 app.use('/groups', require('./routes/group'));
 
 // ========================================
+// Sentry エラーハンドラー（ルート登録後・カスタムエラーハンドラーの前）
+// ========================================
+// ルーターで発生した例外を自動キャプチャして Sentry に送信する
+Sentry.setupExpressErrorHandler(app);
+
+// ========================================
 // uploadsディレクトリの確保（messages APIが使用）
 // ========================================
 const uploadDir = path.join(__dirname, 'uploads');
@@ -164,11 +184,14 @@ if (process.env.NODE_ENV !== 'test') {
 // ========================================
 process.on('uncaughtException', (err) => {
   console.error('【致命的エラー】uncaughtException:', err);
+  Sentry.captureException(err); // Sentry にエラーを送信
   // プロセスを終了させない（サーバーを継続稼働）
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('【警告】unhandledRejection:', reason, 'at:', promise);
+  // Promise rejection も Sentry に送信
+  Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
   // プロセスを終了させない（サーバーを継続稼働）
 });
 
