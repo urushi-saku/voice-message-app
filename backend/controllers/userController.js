@@ -8,6 +8,7 @@ const User = require('../models/User');
 const Follower = require('../models/Follower');
 const Message = require('../models/Message');
 const fs = require('fs').promises;
+const cache = require('../utils/cache');
 
 // ========================================
 // ユーザー一覧取得
@@ -22,6 +23,11 @@ exports.getUsers = async (req, res) => {
     const limit = Math.min(50, parseInt(req.query.limit) || 20);
     const q     = req.query.q?.trim();
     const skip  = (page - 1) * limit;
+
+    // キャッシュチェック（ユーザー・ページ・クエリごとに区別）
+    const cacheKey = `users:${currentUserId}:p${page}:l${limit}:q${q || ''}`;
+    const cachedUsers = await cache.get(cacheKey);
+    if (cachedUsers) return res.json(cachedUsers);
 
     const filter = { _id: { $ne: currentUserId } };
     if (q) {
@@ -40,7 +46,7 @@ exports.getUsers = async (req, res) => {
       User.countDocuments(filter),
     ]);
 
-    res.json({
+    const result = {
       users,
       pagination: {
         total,
@@ -49,7 +55,9 @@ exports.getUsers = async (req, res) => {
         totalPages: Math.ceil(total / limit),
         hasNext: page * limit < total,
       },
-    });
+    };
+    await cache.set(cacheKey, result, cache.TTL.USERS_LIST);
+    res.json(result);
   } catch (error) {
     console.error('ユーザー一覧取得エラー:', error);
     res.status(500).json({ error: 'ユーザー一覧の取得に失敗しました' });
@@ -198,6 +206,14 @@ exports.followUser = async (req, res) => {
       $inc: { followingCount: 1 } // フォローした人のフォロー中数+1
     });
 
+    // フォロー後にキャッシュを無効化
+    await cache.del(
+      `followers:${targetUserId}`,
+      `following:${currentUserId}`,
+      `user:${targetUserId}`,
+      `user:${currentUserId}`,
+    );
+
     res.status(201).json({ message: 'フォローしました' });
   } catch (error) {
     console.error('フォローエラー:', error);
@@ -236,6 +252,14 @@ exports.unfollowUser = async (req, res) => {
       $inc: { followingCount: -1 } // フォロー中数-1
     });
 
+    // フォロー解除後にキャッシュを無効化
+    await cache.del(
+      `followers:${targetUserId}`,
+      `following:${currentUserId}`,
+      `user:${targetUserId}`,
+      `user:${currentUserId}`,
+    );
+
     res.json({ message: 'フォローを解除しました' });
   } catch (error) {
     console.error('フォロー解除エラー:', error);
@@ -251,6 +275,11 @@ exports.unfollowUser = async (req, res) => {
 exports.getFollowers = async (req, res) => {
   try {
     const userId = req.params.id;
+
+    // キャッシュチェック
+    const cacheKey = `followers:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     // ユーザーが存在するか確認
     const user = await User.findById(userId);
@@ -268,6 +297,7 @@ exports.getFollowers = async (req, res) => {
     // followerフィールドの情報のみを抽出
     const followerList = followers.map(f => f.follower);
 
+    await cache.set(cacheKey, followerList, cache.TTL.FOLLOWERS);
     res.json(followerList);
   } catch (error) {
     console.error('フォロワーリスト取得エラー:', error);
@@ -283,6 +313,11 @@ exports.getFollowers = async (req, res) => {
 exports.getFollowing = async (req, res) => {
   try {
     const userId = req.params.id;
+
+    // キャッシュチェック
+    const cacheKey = `following:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
 
     // ユーザーが存在するか確認
     const user = await User.findById(userId);
@@ -300,6 +335,7 @@ exports.getFollowing = async (req, res) => {
     // userフィールドの情報のみを抽出
     const followingList = following.map(f => f.user);
 
+    await cache.set(cacheKey, followingList, cache.TTL.FOLLOWERS);
     res.json(followingList);
   } catch (error) {
     console.error('フォロー中リスト取得エラー:', error);
@@ -316,6 +352,11 @@ exports.getUserById = async (req, res) => {
   try {
     const userId = req.params.id;
 
+    // キャッシュチェック
+    const cacheKey = `user:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     const user = await User.findById(userId)
       .select('username handle email profileImage bio followersCount followingCount createdAt');
 
@@ -323,6 +364,7 @@ exports.getUserById = async (req, res) => {
       return res.status(404).json({ error: 'ユーザーが見つかりません' });
     }
 
+    await cache.set(cacheKey, user, cache.TTL.USER);
     res.json(user);
   } catch (error) {
     console.error('ユーザー詳細取得エラー:', error);
@@ -390,6 +432,9 @@ exports.updateProfile = async (req, res) => {
       { new: true, runValidators: true }
     ).select('username handle email profileImage bio followersCount followingCount');
 
+    // プロフィール更新後にキャッシュを無効化
+    await cache.del(`user:${currentUserId}`);
+
     res.json({
       message: 'プロフィールを更新しました',
       user: updatedUser
@@ -438,6 +483,9 @@ exports.updateProfileImage = async (req, res) => {
       { $set: { profileImage: profileImagePath } },
       { new: true }
     ).select('username email profileImage bio followersCount followingCount');
+
+    // プロフィール画像更新後にキャッシュを無効化
+    await cache.del(`user:${currentUserId}`);
 
     res.json({
       message: 'プロフィール画像を更新しました',

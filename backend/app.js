@@ -30,6 +30,7 @@ const fs = require('fs');                    // ファイル操作を行うた�
 const rateLimit = require('express-rate-limit'); // レート制限
 const helmet = require('helmet');                // セキュリティヘッダー (HSTS 等)
 const connectDB = require('./config/database'); // データベース接続
+require('./config/redis');                       // Redis クライアント起動（キャッシュ層）
 
 const app = express();                       // Expressアプリケーションを作成
 const PORT = process.env.PORT || 3000;       // サーバーが待機するポート番号

@@ -10,6 +10,7 @@ const Follower = require('../models/Follower');
 const { sendPushNotificationToMultiple } = require('../config/firebase');
 const path = require('path');
 const fs = require('fs');
+const cache = require('../utils/cache');
 
 // ========================================
 // メッセージ送信
@@ -100,6 +101,9 @@ exports.sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+
+    // メッセージ送信後にスレッド/受信ボックスキャッシュを無効化
+    cache.invalidateUserMessages(senderId, receiverIds).catch(() => {});
 
     // レスポンスをすぐに返す（通知を待たない）
     res.status(201).json({
@@ -194,6 +198,9 @@ exports.sendTextMessage = async (req, res) => {
 
     await newMessage.save();
 
+    // メッセージ送信後にスレッド/受信ボックスキャッシュを無効化
+    cache.invalidateUserMessages(senderId, receiverIds).catch(() => {});
+
     // レスポンスをすぐに返す（通知を待たない）
     res.status(201).json({ message: 'テキストメッセージを送信しました', messageId: newMessage._id });
 
@@ -236,6 +243,11 @@ exports.getReceivedMessages = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // キャッシュチェック
+    const cacheKey = `received:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     // 自分宛てのメッセージを検索
     const messages = await Message.find({
       receivers: userId,
@@ -263,6 +275,7 @@ exports.getReceivedMessages = async (req, res) => {
       };
     });
 
+    await cache.set(cacheKey, messagesWithReadStatus, cache.TTL.RECEIVED);
     res.json(messagesWithReadStatus);
   } catch (error) {
     console.error('受信メッセージ取得エラー:', error);
@@ -330,6 +343,14 @@ exports.markAsRead = async (req, res) => {
       message.readStatus[readStatusIndex].isRead = true;
       message.readStatus[readStatusIndex].readAt = new Date();
       await message.save();
+
+      // 既読更新後にスレッドキャッシュを無効化
+      const msgSenderId = message.sender.toString();
+      await cache.del(
+        `threads:${userId}`,
+        `thread:${userId}:${msgSenderId}`,
+        `thread:${msgSenderId}:${userId}`,
+      );
     }
 
     res.json({ message: '既読にしました' });
@@ -418,6 +439,12 @@ exports.deleteMessage = async (req, res) => {
       // メッセージレコード削除
       await Message.deleteOne({ _id: messageId });
 
+      // キャッシュ無効化
+      await cache.invalidateUserMessages(
+        message.sender.toString(),
+        message.receivers.map(r => r.toString()),
+      );
+
       return res.json({ 
         message: 'メッセージを削除しました',
         physicallyDeleted: true
@@ -426,6 +453,12 @@ exports.deleteMessage = async (req, res) => {
 
     // 全員削除でない場合：論理削除フラグのみセット
     await message.save();
+
+    // キャッシュ無効化
+    await cache.invalidateUserMessages(
+      message.sender.toString(),
+      message.receivers.map(r => r.toString()),
+    );
 
     res.json({ 
       message: 'メッセージを削除しました',
@@ -639,6 +672,11 @@ exports.getMessageThreads = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // キャッシュチェック
+    const cacheKey = `threads:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     // 自分が送信または受信したメッセージを全取得
     const messages = await Message.find({
       isDeleted: false,
@@ -717,6 +755,7 @@ exports.getMessageThreads = async (req, res) => {
       new Date(b.lastMessageAt) - new Date(a.lastMessageAt)
     );
 
+    await cache.set(cacheKey, threads, cache.TTL.THREADS);
     res.json(threads);
   } catch (error) {
     console.error('スレッド一覧取得エラー:', error);
@@ -825,6 +864,11 @@ exports.getThreadMessages = async (req, res) => {
     const userId = req.user.id;
     const partnerId = req.params.senderId;
 
+    // キャッシュチェック
+    const cacheKey = `thread:${userId}:${partnerId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return res.json(cached);
+
     // 自分 → 相手、または 相手 → 自分のメッセージを取得
     const messages = await Message.find({
       isDeleted: false,
@@ -891,6 +935,7 @@ exports.getThreadMessages = async (req, res) => {
       };
     });
 
+    await cache.set(cacheKey, result, cache.TTL.THREAD_MSGS);
     res.json(result);
   } catch (error) {
     console.error('スレッドメッセージ取得エラー:', error);
