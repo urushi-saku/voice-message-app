@@ -85,80 +85,80 @@
 ```
 voice-message-app/
 ├── backend/
-│   ├── app.js
+│   ├── app.js                          # サーバーエントリーポイント・ルート登録・CORS設定
 │   ├── config/
-│   │   ├── database.js
-│   │   └── firebase.js
-│   ├── models/
-│   │   ├── User.js
-│   │   ├── Follower.js
-│   │   ├── Message.js
-│   │   └── Notification.js
-│   ├── controllers/
-│   │   ├── authController.js
-│   │   ├── userController.js
-│   │   ├── messageController.js
-│   │   └── notificationController.js
-│   ├── routes/
-│   │   ├── auth.js
-│   │   ├── user.js
-│   │   ├── message.js
-│   │   └── notification.js
+│   │   ├── database.js                 # MongoDB Atlas 接続設定
+│   │   └── firebase.js                 # Firebase Admin SDK 初期化・FCM送信関数
+│   ├── models/                         # Mongoose スキーマ定義
+│   │   ├── User.js                     # ユーザー（認証情報・プロフィール・FCMトークン・refreshToken）
+│   │   ├── Follower.js                 # フォロー関係（user ↔ follower の対）
+│   │   ├── Message.js                  # メッセージ（音声/テキスト・既読状態・論理削除）
+│   │   └── Notification.js             # 通知（follow/message/system・既読管理）
+│   ├── controllers/                    # ビジネスロジック
+│   │   ├── authController.js           # 登録・ログイン・ログアウト・refresh・パスワードリセット
+│   │   ├── userController.js           # ユーザー一覧/詳細・フォロー・プロフィール編集・アカウント削除
+│   │   ├── messageController.js        # メッセージ送受信・検索・スレッド・既読・削除・ダウンロード
+│   │   └── notificationController.js   # 通知一覧・送信・削除・既読操作
+│   ├── routes/                         # Express ルーター（URLマッピング）
+│   │   ├── auth.js                     # /auth/*
+│   │   ├── user.js                     # /users/*
+│   │   ├── message.js                  # /messages/*
+│   │   └── notification.js             # /notifications/*
 │   ├── middleware/
-│   │   └── auth.js
-│   └── uploads/
-│       └── profiles/
+│   │   └── auth.js                     # JWT 検証ミドルウェア（protect）
+│   └── uploads/                        # アップロードファイル保存先
+│       └── profiles/                   # プロフィール画像
 │
 └── voice_message_app/
     └── lib/
-        ├── main.dart
-        ├── constants.dart
-        ├── firebase_options.dart
-        ├── screens/
-        │   ├── home_page.dart
-        │   ├── login_screen.dart
-        │   ├── register_screen.dart
-        │   ├── recording_screen.dart
-        │   ├── select_follower_screen.dart
-        │   ├── followers_tab.dart
-        │   ├── received_files_tab.dart
-        │   ├── voice_playback_screen.dart
-        │   ├── profile_page.dart
-        │   ├── edit_profile_screen.dart
-        │   ├── thread_detail_screen.dart
-        │   └── settings_screen.dart
-        ├── services/
-        │   ├── auth_service.dart
-        │   ├── user_service.dart
-        │   ├── message_service.dart
-        │   ├── notification_service.dart
-        │   ├── audio_service.dart
-        │   ├── fcm_service.dart
-        │   ├── navigation_service.dart
-        │   ├── offline_service.dart
-        │   ├── sync_service.dart
-        │   ├── network_connectivity_service.dart
-        │   └── api_service.dart
-        ├── models/
-        │   ├── message.dart
-        │   ├── offline_model.dart
-        │   └── recording_config.dart
-        ├── providers/
-        │   ├── auth_provider.dart
-        │   ├── theme_provider.dart
-        │   ├── message_provider.dart
-        │   └── recording_provider.dart
-        ├── widgets/
-        │   ├── message_bubble.dart
-        │   ├── message_options_sheet.dart
-        │   ├── voice_messages_panel.dart
-        │   ├── offline_banner.dart
-        │   ├── custom_page_route.dart
-        │   ├── animated_widgets.dart
-        │   ├── accessible_widgets.dart
-        │   └── responsive_layout.dart
+        ├── main.dart                   # アプリエントリーポイント・Provider/Firebase 初期化
+        ├── constants.dart              # アプリ全体の定数（色・サイズ等）
+        ├── firebase_options.dart       # FlutterFire 自動生成設定
+        ├── screens/                    # 画面 UI
+        │   ├── home_page.dart          # ホーム（タブナビゲーション: メッセージ/フォロー/プロフィール）
+        │   ├── login_screen.dart       # ログイン画面
+        │   ├── register_screen.dart    # ユーザー登録画面
+        │   ├── recording_screen.dart   # 音声録音・送信画面
+        │   ├── select_follower_screen.dart  # 送信先フォロワー選択画面
+        │   ├── followers_tab.dart      # フォロワー/フォロー中一覧・ユーザー検索タブ
+        │   ├── received_files_tab.dart # 受信メッセージ一覧タブ（スレッド表示）
+        │   ├── voice_playback_screen.dart   # 音声ファイルダウンロード・再生画面
+        │   ├── profile_page.dart       # 自分のプロフィール表示画面
+        │   ├── edit_profile_screen.dart # プロフィール編集（名前・自己紹介・画像）
+        │   ├── thread_detail_screen.dart    # 特定ユーザーとのチャット詳細画面
+        │   └── settings_screen.dart    # 設定画面（録音品質・ダークモード）
+        ├── services/                   # API通信・ビジネスロジック層
+        │   ├── auth_service.dart       # 認証API・トークン管理（login/register/logout/refresh）
+        │   ├── user_service.dart       # ユーザーAPI（検索・フォロー・プロフィール更新・削除）
+        │   ├── message_service.dart    # メッセージAPI（送受信・検索・スレッド・オフライン対応）
+        │   ├── notification_service.dart    # 通知API（一覧・送信・削除・既読）
+        │   ├── audio_service.dart      # 音声録音・再生・品質設定
+        │   ├── fcm_service.dart        # FCMプッシュ通知受信・ローカル通知表示
+        │   ├── navigation_service.dart # グローバルNavigator（通知タップ時の画面遷移）
+        │   ├── offline_service.dart    # Hive ローカルストレージ（メッセージ・ユーザーキャッシュ）
+        │   ├── sync_service.dart       # オフライン送信キューのネットワーク復帰時自動同期
+        │   ├── network_connectivity_service.dart  # ネットワーク接続状態監視
+        │   └── api_service.dart        # 旧汎用HTTPクライアント（レガシー）
+        ├── models/                     # データクラス定義
+        │   ├── message.dart            # MessageInfo / ThreadInfo（APIレスポンス用）
+        │   ├── offline_model.dart      # オフライン保存用モデル群（Hive アダプター）
+        │   └── recording_config.dart   # 録音品質設定（低/中/高プリセット）
+        ├── providers/                  # Provider 状態管理
+        │   ├── auth_provider.dart      # 認証状態（ログイン中ユーザー・トークン）
+        │   ├── theme_provider.dart     # ダークモード ON/OFF 状態
+        │   ├── message_provider.dart   # スレッドメッセージ読み込み・送信・削除
+        │   └── recording_provider.dart # 録音状態・再生・サムネイル・送信フロー
+        ├── widgets/                    # 再利用可能な UI コンポーネント
+        │   ├── message_bubble.dart     # チャット吹き出し（アバター・しっぽ・既読表示）
+        │   ├── message_options_sheet.dart   # メッセージ長押し時のオプションシート
+        │   ├── voice_messages_panel.dart    # 右スワイプで表示されるボイス一覧パネル
+        │   ├── offline_banner.dart     # オフライン状態バナー・接続状態インジケーター
+        │   ├── custom_page_route.dart  # カスタムページ遷移（SlideUp / FadeSlide / ScaleFade）
+        │   ├── animated_widgets.dart   # アニメーションウィジェット（Pulse / Rotate / SlideIn）
+        │   ├── accessible_widgets.dart # アクセシビリティ対応ウィジェット（スクリーンリーダー等）
+        │   └── responsive_layout.dart  # レスポンシブ対応（Mobile / Tablet / Desktop）
         └── theme/
-            └── app_theme.dart
+            └── app_theme.dart          # Material Design 3 準拠テーマ定義（ライト/ダーク）
 ```
 
 ---
