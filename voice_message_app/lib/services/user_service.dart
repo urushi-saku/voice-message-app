@@ -379,5 +379,4 @@ class UserService {
       throw Exception(error['error'] ?? 'アカウントの削除に失敗しました');
     }
   }
-
 }

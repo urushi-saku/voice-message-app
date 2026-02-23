@@ -452,6 +452,67 @@ exports.downloadMessage = async (req, res) => {
 };
 
 // ========================================
+// メッセージ詳細取得
+// GET /messages/:id
+// ========================================
+// 指定したIDのメッセージ詳細を取得します
+// 送信者または受信者のみアクセス可能です
+exports.getMessageById = async (req, res) => {
+  try {
+    const messageId = req.params.id;
+    const userId = req.user.id;
+
+    const message = await Message.findOne({ _id: messageId, isDeleted: false })
+      .populate('sender', 'username handle profileImage')
+      .populate('receivers', 'username handle profileImage');
+
+    if (!message) {
+      return res.status(404).json({ error: 'メッセージが見つかりません' });
+    }
+
+    // 送信者または受信者のみアクセス可能
+    const isSender   = message.sender._id.toString() === userId;
+    const isReceiver = message.receivers.some(r => r._id.toString() === userId);
+
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({ error: 'このメッセージにアクセスする権限がありません' });
+    }
+
+    // 自分の既読状態を取得
+    const readStatus = message.readStatus.find(rs => rs.user.toString() === userId);
+
+    res.json({
+      _id: message._id,
+      sender: {
+        _id: message.sender._id,
+        username: message.sender.username,
+        handle: message.sender.handle,
+        profileImage: message.sender.profileImage,
+      },
+      receivers: message.receivers.map(r => ({
+        _id: r._id,
+        username: r.username,
+        handle: r.handle,
+        profileImage: r.profileImage,
+      })),
+      messageType: message.messageType,
+      textContent: message.textContent,
+      filePath: message.filePath,
+      fileSize: message.fileSize,
+      duration: message.duration,
+      mimeType: message.mimeType,
+      attachedImage: message.attachedImage,
+      sentAt: message.sentAt,
+      isRead: readStatus ? readStatus.isRead : false,
+      readAt: readStatus ? readStatus.readAt : null,
+    });
+  } catch (error) {
+    console.error('メッセージ詳細取得エラー:', error);
+    res.status(500).json({ error: 'メッセージの取得に失敗しました' });
+  }
+};
+
+// ========================================
 // メッセージ検索
 // GET /messages/search
 // ========================================

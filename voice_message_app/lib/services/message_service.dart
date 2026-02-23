@@ -567,6 +567,40 @@ class MessageService {
   }
 
   /// ========================================
+  /// ========================================
+  /// メッセージ詳細取得
+  /// GET /messages/:id
+  /// ========================================
+  /// 指定したIDのメッセージ詳細を取得します
+  ///
+  /// 【パラメータ】
+  /// - messageId: 取得するメッセージのID
+  static Future<MessageInfo> getMessageById(String messageId) async {
+    final token = await AuthService.getToken();
+    if (token == null) throw Exception('認証が必要です');
+
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$BASE_URL/messages/$messageId'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return MessageInfo.fromJson(jsonDecode(response.body));
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['error'] ?? 'メッセージの取得に失敗しました');
+      }
+    } on SocketException {
+      throw Exception('サーバーに接続できません。バックエンドが起動しているか確認してください。');
+    } on TimeoutException {
+      throw Exception('接続がタイムアウトしました。再度お試しください。');
+    }
+  }
+
+  /// ========================================
   /// スレッド一覧取得（送信者ごとにグループ化）
   /// GET /messages/threads
   /// ========================================

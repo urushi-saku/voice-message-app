@@ -927,9 +927,8 @@ voice-message-app/
 ✅ PUT    /messages/:id/read      - 既読マーク
 ✅ DELETE /messages/:id            - メッセージ削除（論理削除）
 ✅ GET    /messages/:id/download  - ファイルダウンロード
-⏳ GET    /messages/:id            - メッセージ詳細（未実装）
-⏳ GET    /messages/search         - メッセージ検索（未実装）
-⏳ POST   /messages/:id/transcribe - 音声テキスト化（未実装）
+✅ GET    /messages/:id            - メッセージ詳細
+✅ GET    /messages/search         - メッセージ検索（送信者名・日付・既読フィルター）
 
 【ファイルAPI（旧バージョン、非推奨）】
 ⚠️  POST   /upload                  - ファイルアップロード（/messages/sendを使用）
@@ -975,6 +974,14 @@ voice-message-app/
 ================================================================================
 8. 更新履歴
 ================================================================================
+
+2026-02-23: メッセージAPI拡張 ✅
+  - backend/controllers/messageController.js 追加
+    └─ GET /messages/:id: メッセージ詳細取得（送信者・受信者のみアクセス可）
+  - backend/routes/message.js 更新
+    └─ GET /messages/:id ルート追加
+  - voice_message_app/lib/services/message_service.dart 更新
+    └─ getMessageById(): メッセージ詳細取得
 
 2026-02-23: ユーザーAPI拡張 ✅
   - backend/controllers/userController.js 追加

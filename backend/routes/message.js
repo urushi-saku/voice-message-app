@@ -19,7 +19,8 @@ const {
   downloadMessage,
   searchMessages,
   getMessageThreads,
-  getThreadMessages
+  getThreadMessages,
+  getMessageById,
 } = require('../controllers/messageController');
 
 // ========================================
@@ -97,6 +98,10 @@ router.get('/thread/:senderId', protect, getThreadMessages);
 // 送信メッセージリスト取得
 // GET /messages/sent
 router.get('/sent', protect, getSentMessages);
+
+// メッセージ詳細取得
+// GET /messages/:id
+router.get('/:id', protect, getMessageById);
 
 // メッセージ既読
 // PUT /messages/:id/read
