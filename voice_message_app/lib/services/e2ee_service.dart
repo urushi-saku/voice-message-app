@@ -1,7 +1,7 @@
 // ========================================
 // E2EE（エンドツーエンド暗号化）サービス
 // ========================================
-// X25519 Diffie-Hellman 鍵交換 + ChaCha20-Poly1305 認証付き暗号化により、
+// X25519 Diffie-Hellman 鍵交換 + XSalsa20-Poly1305 認証付き暗号化により、
 // サーバーを経由しても内容を読めないエンドツーエンド暗号化を実現します
 //
 // 【暗号アーキテクチャ（ハイブリッド暗号）】
@@ -9,20 +9,30 @@
 //   2. 公開鍵のみサーバーに登録（秘密鍵はデバイスの SecureStorage にのみ保管）
 //   3. 送信時:
 //      a. ランダムな 32 バイトのメッセージ鍵 (MK) を生成
-//      b. MK で音声/テキストを ChaCha20-Poly1305 で対称暗号化
-//      c. 受信者ごとに一時 X25519 キーペアを生成 → DH 鍵合意 → 共有鍵で MK を暗号化
+//      b. MK で音声/テキストを XSalsa20-Poly1305 で対称暗号化
+//      c. 受信者ごとに一時 X25519 キーペアを生成
+//         → DH ＋ HSalsa20 (crypto_box_beforenm) で共有鍵を導出
+//         → 共有鍵で MK を暗号化
 //      d. サーバーへ: [暗号化済みコンテンツ, ノンス, 受信者ごとの暗号化済み MK] を送信
 //   4. 受信時:
-//      a. 自分宛の encryptedKeyEntry を DH + ChaCha20 で復号 → MK を取得
-//      b. MK + ノンスで暗号化済みコンテンツを復号 → 平文を取得
+//      a. 自分宛の encryptedKeyEntry を DH ＋ XSalsa20 で復号 → MK を取得
+//      b. MK ＋ ノンスで暗号化済みコンテンツを復号 → 平文を取得
 //
-// 【パッケージ依存】
-//   cryptography: ^2.7.0
+// 【使用ライブラリ】
+//   sodium: ^3.4.6        … Dart バインディング (libsodium の Dart API)
+//   sodium_libs: ^3.4.6+4 … ネイティブ libsodium バイナリの自動組み込み (Android/iOS/etc.)
 //   flutter_secure_storage: ^9.2.4
+//
+// 【旧実装 (cryptography: ^2.7.0) との変更点】
+//   ・ChaCha20-Poly1305 (12B nonce) → XSalsa20-Poly1305 (24B nonce)
+//   ・MAC 位置: 末尾付加 → 先頭付加 (libsodium "easy" 標準形式)
+//   ・DH 出力をそのまま鍵に使用 → crypto_box_beforenm (DH + HSalsa20) で安全に鍵導出
+//   ・純 Dart → ネイティブ C 実装 (FFI) による大幅な高速化
 
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:cryptography/cryptography.dart';
+import 'package:sodium/sodium.dart' hide SodiumInit;
+import 'package:sodium_libs/sodium_libs.dart' show SodiumInit;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
@@ -42,9 +52,9 @@ class ReceiverKey {
 /// 受信者ごとの暗号化済み鍵エントリ
 class EncryptedKeyEntry {
   final String userId;
-  final String encryptedKey; // Base64: DH共有鍵で暗号化されたメッセージ鍵 + MAC
+  final String encryptedKey; // Base64: MAC(16B) + 暗号化メッセージ鍵 (libsodium easy 形式)
   final String ephemeralPublicKey; // Base64: このエントリ専用の一時公開鍵 (32 bytes)
-  final String keyNonce; // Base64: ChaCha20 ノンス (12 bytes)
+  final String keyNonce; // Base64: XSalsa20 ノンス (24 bytes)
 
   const EncryptedKeyEntry({
     required this.userId,
@@ -63,8 +73,9 @@ class EncryptedKeyEntry {
 
 /// 暗号化の結果
 class E2eePayload {
-  final String encryptedContent; // Base64: ChaCha20 暗号化済みコンテンツ + MAC
-  final String contentNonce; // Base64: ChaCha20 ノンス (12 bytes)
+  final String
+  encryptedContent; // Base64: MAC(16B) + 暗号化コンテンツ (libsodium easy 形式)
+  final String contentNonce; // Base64: XSalsa20 ノンス (24 bytes)
   final List<EncryptedKeyEntry> encryptedKeys;
 
   const E2eePayload({
@@ -79,12 +90,16 @@ class E2eePayload {
 // ===================================================
 class E2eeService {
   static const _storage = FlutterSecureStorage();
-  static const _skStorageKey = 'e2ee_secret_key';
-  static const _pkStorageKey = 'e2ee_public_key';
+  static const _skStorageKey = 'e2ee_secret_key_v2'; // v2: sodium 移行後の鍵
+  static const _pkStorageKey = 'e2ee_public_key_v2';
 
-  // 使用する暗号アルゴリズム
-  static final _dh = X25519();
-  static final _cipher = Chacha20.poly1305Aead();
+  // libsodium インスタンス（遅延初期化シングルトン）
+  static Sodium? _sodium;
+
+  static Future<Sodium> _getSodium() async {
+    _sodium ??= await SodiumInit.init();
+    return _sodium!;
+  }
 
   // ------------------------------------------------
   // キーペア管理
@@ -100,11 +115,13 @@ class E2eeService {
       return (base64Decode(storedPk), base64Decode(storedSk));
     }
 
-    // 新規生成
-    final keyPair = await _dh.newKeyPair();
-    final keyPairData = await keyPair.extract();
-    final pkBytes = Uint8List.fromList(keyPairData.publicKey.bytes);
-    final skBytes = Uint8List.fromList(keyPairData.bytes);
+    // 新規生成 (libsodium: crypto_box_keypair)
+    final na = await _getSodium();
+    final keyPair = na.crypto.box.keyPair();
+
+    final pkBytes = Uint8List.fromList(keyPair.publicKey);
+    final skBytes = Uint8List.fromList(keyPair.secretKey.extractBytes());
+    keyPair.secretKey.dispose(); // 秘密鍵はメモリから消去
 
     await _storage.write(key: _pkStorageKey, value: base64Encode(pkBytes));
     await _storage.write(key: _skStorageKey, value: base64Encode(skBytes));
@@ -174,69 +191,57 @@ class E2eeService {
     Uint8List content,
     List<ReceiverKey> receivers,
   ) async {
-    // ① ランダムなメッセージ鍵を生成（ChaCha20 の鍵長 = 32 bytes）
-    final messageKey = await _cipher.newSecretKey();
-    final messageKeyBytes = await messageKey.extractBytes();
+    final na = await _getSodium();
+    final secretBoxOps = na.crypto.secretBox;
+    final boxOps = na.crypto.box;
 
-    // ② コンテンツを ChaCha20-Poly1305 で対称暗号化
-    final contentNonce = _cipher.newNonce();
-    final contentBox = await _cipher.encrypt(
-      content.toList(),
-      secretKey: messageKey,
+    // ① ランダムなメッセージ鍵を生成（XSalsa20 の鍵長 = 32 bytes）
+    final messageKeyRaw = na.randombytes.buf(secretBoxOps.keyBytes);
+    final messageKeySecure = SecureKey.fromList(na, messageKeyRaw);
+
+    // ② コンテンツを XSalsa20-Poly1305 で対称暗号化
+    //    secretBox.easy → MAC(16B) + ciphertext
+    final contentNonce = na.randombytes.buf(
+      secretBoxOps.nonceBytes,
+    ); // 24 bytes
+    final encryptedContent = secretBoxOps.easy(
+      message: content,
       nonce: contentNonce,
+      key: messageKeySecure,
     );
-
-    // ciphertext + mac(16B) を結合して保存
-    final encryptedContent = Uint8List.fromList([
-      ...contentBox.cipherText,
-      ...contentBox.mac.bytes,
-    ]);
+    messageKeySecure.dispose();
 
     // ③ 受信者ごとにメッセージ鍵を非対称暗号化
     final encryptedKeys = <EncryptedKeyEntry>[];
     for (final r in receivers) {
-      // 受信者ごとに一時キーペアを生成
-      final ephKeyPair = await _dh.newKeyPair();
-      final ephKeyPairData = await ephKeyPair.extract();
-      final ephPublicKeyBytes = Uint8List.fromList(
-        ephKeyPairData.publicKey.bytes,
-      );
+      // 受信者ごとに一時キーペアを生成 (crypto_box_keypair)
+      final ephKeyPair = boxOps.keyPair();
+      final ephPkBytes = Uint8List.fromList(ephKeyPair.publicKey);
 
-      // DH 鍵合意 → 受信者公開鍵 × 一時秘密鍵 → 共有秘密
-      final receiverPublicKey = SimplePublicKey(
-        r.publicKey.toList(),
-        type: KeyPairType.x25519,
-      );
-      final sharedSecret = await _dh.sharedSecretKey(
-        keyPair: ephKeyPair,
-        remotePublicKey: receiverPublicKey,
-      );
-
-      // 共有秘密でメッセージ鍵を暗号化
-      final keyNonce = _cipher.newNonce();
-      final keyBox = await _cipher.encrypt(
-        messageKeyBytes,
-        secretKey: sharedSecret,
+      // DH + XSalsa20-Poly1305 でメッセージ鍵を暗号化 (crypto_box_easy)
+      // 受信者公開鍵 × 一時秘密鍵 → DH 鍵交換 → メッセージ鍵を暗号化
+      final keyNonce = na.randombytes.buf(boxOps.nonceBytes); // 24 bytes
+      final encryptedKey = boxOps.easy(
+        message: messageKeyRaw,
         nonce: keyNonce,
+        publicKey: r.publicKey,
+        secretKey: ephKeyPair.secretKey,
       );
-      final encryptedKey = Uint8List.fromList([
-        ...keyBox.cipherText,
-        ...keyBox.mac.bytes,
-      ]);
+      ephKeyPair.secretKey.dispose();
 
       encryptedKeys.add(
         EncryptedKeyEntry(
           userId: r.userId,
           encryptedKey: base64Encode(encryptedKey),
-          ephemeralPublicKey: base64Encode(ephPublicKeyBytes),
-          keyNonce: base64Encode(Uint8List.fromList(keyNonce)),
+          ephemeralPublicKey: base64Encode(ephPkBytes),
+          keyNonce: base64Encode(keyNonce),
         ),
       );
     }
 
     return E2eePayload(
       encryptedContent: base64Encode(encryptedContent),
-      contentNonce: base64Encode(Uint8List.fromList(contentNonce)),
+      contentNonce: base64Encode(contentNonce),
       encryptedKeys: encryptedKeys,
     );
   }
@@ -266,7 +271,7 @@ class E2eeService {
 
   /// ダウンロードした暗号化済み音声バイト列を復号する
   ///
-  /// 格納形式: [ciphertext ... | MAC(16B)]
+  /// 格納形式: MAC(16B) + ciphertext  ← libsodium secretBox.easy の標準形式
   static Future<Uint8List?> decryptBytes({
     required Uint8List encryptedBytes,
     required String contentNonceB64,
@@ -274,6 +279,10 @@ class E2eeService {
     required String myUserId,
   }) async {
     try {
+      final na = await _getSodium();
+      final secretBoxOps = na.crypto.secretBox;
+      final boxOps = na.crypto.box;
+
       // 自分の秘密鍵を取得
       final (myPkBytes, mySkBytes) = await getOrCreateKeyPair();
 
@@ -288,54 +297,37 @@ class E2eeService {
       }
 
       final ephPkBytes = base64Decode(myEntry['ephemeralPublicKey'] as String);
-      final keyNonceBytes = base64Decode(myEntry['keyNonce'] as String);
-      final encKeyBytes = base64Decode(myEntry['encryptedKey'] as String);
-
-      // 自分のキーペアを復元
-      final myKeyPair = SimpleKeyPairData(
-        mySkBytes.toList(),
-        publicKey: SimplePublicKey(
-          myPkBytes.toList(),
-          type: KeyPairType.x25519,
-        ),
-        type: KeyPairType.x25519,
+      final keyNonceBytes = Uint8List.fromList(
+        base64Decode(myEntry['keyNonce'] as String),
+      );
+      final encKeyBytes = Uint8List.fromList(
+        base64Decode(myEntry['encryptedKey'] as String),
       );
 
-      // DH 鍵合意: 自分の秘密鍵 × 送信側の一時公開鍵 → 共有秘密
-      final ephPublicKey = SimplePublicKey(
-        ephPkBytes.toList(),
-        type: KeyPairType.x25519,
-      );
-      final sharedSecret = await _dh.sharedSecretKey(
-        keyPair: myKeyPair,
-        remotePublicKey: ephPublicKey,
-      );
+      // 自分の秘密鍵を SecureKey に変換
+      final mySecretKey = SecureKey.fromList(na, mySkBytes);
 
-      // メッセージ鍵を復号（末尾 16 バイトが MAC）
-      const macLength = 16;
-      final keySecretBox = SecretBox(
-        encKeyBytes.sublist(0, encKeyBytes.length - macLength).toList(),
-        nonce: keyNonceBytes.toList(),
-        mac: Mac(encKeyBytes.sublist(encKeyBytes.length - macLength).toList()),
+      // DH + XSalsa20-Poly1305 でメッセージ鍵を復号 (crypto_box_openEasy)
+      // 送信側の一時公開鍵 × 自分の秘密鍵 → DH 鍵交換 → メッセージ鍵を復号
+      final messageKeyBytes = boxOps.openEasy(
+        cipherText: encKeyBytes,
+        nonce: keyNonceBytes,
+        publicKey: ephPkBytes,
+        secretKey: mySecretKey,
       );
-      final messageKeyBytes = await _cipher.decrypt(
-        keySecretBox,
-        secretKey: sharedSecret,
-      );
+      mySecretKey.dispose();
 
       // コンテンツを復号
-      final contentNonceBytes = base64Decode(contentNonceB64);
-      final contentSecretBox = SecretBox(
-        encryptedBytes.sublist(0, encryptedBytes.length - macLength).toList(),
-        nonce: contentNonceBytes.toList(),
-        mac: Mac(
-          encryptedBytes.sublist(encryptedBytes.length - macLength).toList(),
-        ),
+      final contentNonceBytes = Uint8List.fromList(
+        base64Decode(contentNonceB64),
       );
-      final plaintext = await _cipher.decrypt(
-        contentSecretBox,
-        secretKey: SecretKey(messageKeyBytes),
+      final messageKeySecure = SecureKey.fromList(na, messageKeyBytes);
+      final plaintext = secretBoxOps.openEasy(
+        cipherText: encryptedBytes,
+        nonce: contentNonceBytes,
+        key: messageKeySecure,
       );
+      messageKeySecure.dispose();
 
       return Uint8List.fromList(plaintext);
     } catch (e) {

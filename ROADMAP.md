@@ -233,7 +233,7 @@ voice-message-app/
 
 ### Phase 5 — セキュリティ・パフォーマンス
 
-- [x] エンドツーエンド暗号化（X25519 DH + ChaCha20-Poly1305）
+- [x] エンドツーエンド暗号化（X25519 DH + XSalsa20-Poly1305、libsodium FFI）
 - [x] レート制限（express-rate-limit）
 - [x] HTTPS/TLS 強制
 - [x] Sentry によるエラーモニタリング
@@ -267,6 +267,7 @@ voice-message-app/
 | 認証 | JWT, bcrypt, nodemailer |
 | ファイル | multer |
 | 通知 | Firebase Cloud Messaging |
+| E2EE | libsodium (sodium + sodium_libs FFI), flutter_secure_storage |
 | バージョン管理 | Git / GitHub |
 
 ---
@@ -318,6 +319,17 @@ voice-message-app/
   - 認証制限: 1IP あたり 15 分間 20 リクエスト（ブルートフォース対策、全 `/auth` ルートに適用）
   - 送信制限: 1IP あたり 1 分間 30 リクエスト（スパム対策、`/messages/send` `/messages/send-text` に適用）
   - テスト環境ではすべてのレート制限を自動スキップ（`NODE_ENV=test`）
+
+### 2026-02-23
+- E2EE 暗号ライブラリを純 Dart → libsodium FFI に移行（高速化）
+  - 背景: `cryptography: ^2.7.0` は純 Dart 実装のため、音声ファイル等の大容量データ暗号化が低速
+  - 変更: `cryptography` → `sodium: ^3.4.6` + `sodium_libs: ^3.4.6+4` (Skycoder42、publisher:skycoder42.de)
+  - 暗号アルゴリズム変更: X25519 + ChaCha20-Poly1305 (12B nonce) → X25519 + XSalsa20-Poly1305 (24B nonce)
+  - DH 鍵導出: 生の DH 出力をそのまま鍵利用 → `crypto_box_easy` / `crypto_box_openEasy` で内部的に HSalsa20 を用いた安全な鍵導出
+  - MAC 格納形式: 末尾付加 (CT+MAC) → 先頭付加 (MAC+CT、libsodium easy 標準)
+  - キーストレージキーを `e2ee_secret_key_v2` / `e2ee_public_key_v2` に更新（旧実装と競合回避）
+  - `SecureKey` のメモリ消去 (`.dispose()`) でセキュアなキー管理を実現
+  - `SodiumInit` は `sodium_libs` からのみ import（`sodium.dart` から `hide SodiumInit`）
 
 ### 2026-02-23
 - E2EE（エンドツーエンド暗号化）実装

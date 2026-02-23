@@ -111,10 +111,13 @@ dependencies:
   uuid: ^4.0.0
 
   # ========== E2E暗号化関連 ==========
-  # X25519 鍵交換 + ChaCha20-Poly1305 暗号化ライブラリ
-  # 初学者向け説明：X25519 Diffie-Hellman鍵交換で共有秘密を生成し、
-  #             ChaCha20-Poly1305認証付き暗号でメッセージを保護する
-  cryptography: ^2.7.0
+  # libsodium ネイティブ C ライブラリの Dart FFI バインディング
+  # 初学者向け説明：X25519 Diffie-Hellman鍵交換（crypto_box）＋
+  #             XSalsa20-Poly1305認証付き暗号（secretBox）を
+  #             純 Dart ではなくネイティブ C バイナリで実行するため、
+  #             音声ファイルなど大容量データの暗号化が高速になります
+  sodium: ^3.4.6        # Dart API バインディング (platform-agnostic)
+  sodium_libs: ^3.4.6+4 # 各プラットフォーム向けネイティブバイナリの自動組み込み
 
   # セキュアストレージ（秘密鍵の保管）
   # 初学者向け説明：OSのKeychain/KeyStoreを使い、秘密鍵を安全に保存します
