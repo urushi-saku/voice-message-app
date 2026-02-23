@@ -930,12 +930,6 @@ voice-message-app/
 ✅ GET    /messages/:id            - メッセージ詳細
 ✅ GET    /messages/search         - メッセージ検索（送信者名・日付・既読フィルター）
 
-【ファイルAPI（旧バージョン、非推奨）】
-⚠️  POST   /upload                  - ファイルアップロード（/messages/sendを使用）
-⚠️  GET    /voices                  - ファイル一覧（/messages/*を使用）
-⚠️  GET    /voice/:filename         - ファイルダウンロード（/messages/:id/downloadを使用）
-⏳ DELETE /voice/:filename         - ファイル削除（未実装）
-
 【通知API】
 ✅ GET    /notifications           - 通知一覧（ページング・未読フィルター・未読数付き）
 ✅ POST   /notifications           - 通知送信

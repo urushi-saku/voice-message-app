@@ -33,12 +33,12 @@ class NotificationInfo {
 
   factory NotificationInfo.fromJson(Map<String, dynamic> json) {
     return NotificationInfo(
-      id:        json['_id']?.toString() ?? '',
-      type:      json['type'] as String,
-      content:   json['content'] as String,
+      id: json['_id']?.toString() ?? '',
+      type: json['type'] as String,
+      content: json['content'] as String,
       relatedId: json['relatedId']?.toString(),
-      isRead:    json['isRead'] as bool? ?? false,
-      readAt:    json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
+      isRead: json['isRead'] as bool? ?? false,
+      readAt: json['readAt'] != null ? DateTime.parse(json['readAt']) : null,
       createdAt: DateTime.parse(json['createdAt']),
       sender: json['sender'] != null
           ? NotificationSender.fromJson(json['sender'] as Map<String, dynamic>)
@@ -63,9 +63,9 @@ class NotificationSender {
 
   factory NotificationSender.fromJson(Map<String, dynamic> json) {
     return NotificationSender(
-      id:           json['_id']?.toString() ?? '',
-      username:     json['username'] as String,
-      handle:       json['handle'] as String,
+      id: json['_id']?.toString() ?? '',
+      username: json['username'] as String,
+      handle: json['handle'] as String,
       profileImage: json['profileImage']?.toString(),
     );
   }
@@ -89,17 +89,16 @@ class NotificationPagination {
 
   factory NotificationPagination.fromJson(Map<String, dynamic> json) {
     return NotificationPagination(
-      total:      json['total'] as int,
-      page:       json['page'] as int,
-      limit:      json['limit'] as int,
+      total: json['total'] as int,
+      page: json['page'] as int,
+      limit: json['limit'] as int,
       totalPages: json['totalPages'] as int,
-      hasNext:    json['hasNext'] as bool,
+      hasNext: json['hasNext'] as bool,
     );
   }
 }
 
 class NotificationService {
-
   // ========================================
   // 通知一覧取得
   // GET /notifications?page=1&limit=20&unreadOnly=false
@@ -124,12 +123,13 @@ class NotificationService {
     if (token == null) throw Exception('認証が必要です');
 
     final params = {
-      'page':       page.toString(),
-      'limit':      limit.toString(),
+      'page': page.toString(),
+      'limit': limit.toString(),
       'unreadOnly': unreadOnly.toString(),
     };
-    final uri = Uri.parse('$BASE_URL/notifications')
-        .replace(queryParameters: params);
+    final uri = Uri.parse(
+      '$BASE_URL/notifications',
+    ).replace(queryParameters: params);
 
     try {
       final response = await http
@@ -143,8 +143,9 @@ class NotificationService {
               .map((n) => NotificationInfo.fromJson(n))
               .toList(),
           'unreadCount': data['unreadCount'] as int,
-          'pagination':  NotificationPagination.fromJson(
-              data['pagination'] as Map<String, dynamic>),
+          'pagination': NotificationPagination.fromJson(
+            data['pagination'] as Map<String, dynamic>,
+          ),
         };
       } else {
         final error = jsonDecode(response.body);
@@ -179,8 +180,8 @@ class NotificationService {
 
     final body = <String, dynamic>{
       'recipientId': recipientId,
-      'type':        type,
-      'content':     content,
+      'type': type,
+      'content': content,
       if (relatedId != null) 'relatedId': relatedId,
     };
 
@@ -189,8 +190,8 @@ class NotificationService {
           .post(
             Uri.parse('$BASE_URL/notifications'),
             headers: {
-              'Authorization':  'Bearer $token',
-              'Content-Type':   'application/json',
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
             },
             body: jsonEncode(body),
           )
@@ -199,7 +200,8 @@ class NotificationService {
       if (response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return NotificationInfo.fromJson(
-            data['notification'] as Map<String, dynamic>);
+          data['notification'] as Map<String, dynamic>,
+        );
       } else {
         final error = jsonDecode(response.body);
         throw Exception(error['error'] ?? '通知の送信に失敗しました');
