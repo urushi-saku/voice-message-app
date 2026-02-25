@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recording_config.dart';
+import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 
 /// アプリケーション設定画面
@@ -197,6 +198,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             );
           }).toList(),
+
+          const SizedBox(height: 24),
+
+          // ========================================
+          // アカウントセクション
+          // ========================================
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'アカウント',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text(
+                'ログアウト',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('ログアウト'),
+                    content: const Text('ログアウトしますか？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                            foregroundColor: Colors.red),
+                        child: const Text('ログアウト'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true && mounted) {
+                  await context.read<AuthProvider>().logout();
+                }
+              },
+            ),
+          ),
 
           const SizedBox(height: 24),
 

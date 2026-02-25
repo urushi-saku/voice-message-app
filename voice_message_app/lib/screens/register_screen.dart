@@ -3,6 +3,8 @@
 // ========================================
 // ユーザーが新規アカウントを登録する画面
 
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -28,6 +30,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
 
+  // ========================================
+  // ランダムhandle生成
+  // ========================================
+  static String _generateRandomHandle() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    final rand = Random.secure();
+    final suffix =
+        List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+    return 'user_$suffix';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _handleController.text = _generateRandomHandle();
+  }
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -41,18 +60,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ========================================
   // バリデーション関数
   // ========================================
-  String? _validateHandle(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'IDを入力してください';
-    }
-    final lower = value.toLowerCase();
-    final regex = RegExp(r'^[a-z0-9_]{3,20}$');
-    if (!regex.hasMatch(lower)) {
-      return 'IDは英小文字・数字・_の3〜20文字で入力してください';
-    }
-    return null;
-  }
-
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) {
       return 'ユーザー名を入力してください';
@@ -199,26 +206,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ID入力フィールド
-                      TextFormField(
-                        controller: _handleController,
-                        validator: _validateHandle,
-                        autocorrect: false,
-                        decoration: InputDecoration(
-                          labelText: 'ID（@handle）',
-                          hintText: 'taro_123',
-                          prefixText: '@',
-                          helperText: '英小文字・数字・_の3〜20文字。後から変更可能',
-                          prefixIcon: const Icon(Icons.alternate_email),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
                       // メールアドレス入力フィールド
                       TextFormField(
                         controller: _emailController,
@@ -344,9 +331,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
 
                 // ========================================
+                // またはの分割線
+                // ========================================
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[300])),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'または',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[300])),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ========================================
+                // Google 登録ボタン
+                // ========================================
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final authProvider =
+                          Provider.of<AuthProvider>(context, listen: false);
+                      final success = await authProvider.loginWithGoogle();
+                      if (mounted) {
+                        if (success) {
+                          Navigator.of(context).pushReplacementNamed('/home');
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  authProvider.error ?? 'Google 登録に失敗しました'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.g_mobiledata, size: 20),
+                    label: const Text(
+                      'Google で登録',
+                      style: TextStyle(fontSize: 16, color: Colors.black87),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey[300]!),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ========================================
                 // ログインリンク
                 // ========================================
-                const SizedBox(height: 24),
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,

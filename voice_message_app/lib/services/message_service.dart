@@ -732,25 +732,43 @@ class MessageService {
   /// ②GET リクエスト送信
   /// ③レスポンスからThreadInfoリストを生成
   static Future<List<ThreadInfo>> getMessageThreads() async {
-    final token = await AuthService.getToken();
+    String? token = await AuthService.getToken();
     if (token == null) {
-      throw Exception('認証が必要です');
+      // refreshToken で復帰を試みる
+      final refreshed = await AuthService.refreshToken();
+      if (!refreshed) throw Exception('ログインし直してください');
+      token = await AuthService.getToken();
     }
 
     try {
-      final response = await http
+      Future<http.Response> doRequest(String t) => http
           .get(
             Uri.parse('$BASE_URL/messages/threads'),
-            headers: {'Authorization': 'Bearer $token'},
+            headers: {'Authorization': 'Bearer $t'},
           )
           .timeout(const Duration(seconds: 10));
+
+      var response = await doRequest(token!);
+
+      // 401 → トークンリフレッシュして1回だけリトライ
+      if (response.statusCode == 401) {
+        final refreshed = await AuthService.refreshToken();
+        if (!refreshed) throw Exception('ログインし直してください');
+        final newToken = await AuthService.getToken();
+        if (newToken == null) throw Exception('ログインし直してください');
+        response = await doRequest(newToken);
+      }
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
         return jsonList.map((json) => ThreadInfo.fromJson(json)).toList();
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['error'] ?? 'スレッド一覧の取得に失敗しました');
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        throw Exception(
+          body['error'] ??
+              body['message'] ??
+              'スレッド一覧の取得に失敗しました（${response.statusCode}）',
+        );
       }
     } on SocketException {
       throw Exception('サーバーに接続できません。バックエンドが起動しているか確認してください。');
@@ -758,6 +776,9 @@ class MessageService {
       throw Exception('接続がタイムアウトしました。再度お試しください。');
     } on http.ClientException {
       throw Exception('通信エラーが発生しました。ネットワーク接続を確認してください。');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('スレッド一覧の読み込みエラー: $e');
     }
   }
 

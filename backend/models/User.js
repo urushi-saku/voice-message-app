@@ -130,6 +130,24 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+
+    // ========================================
+    // ソーシャル認証（Google OAuth）
+    // ========================================
+    // Google OAuth 情報
+    googleId: {
+      type: String,
+      default: null,
+      sparse: true, // null 値の重複を許可
+    },
+
+    // OAuth でログインする場合、パスワード不要
+    // authType: 'email' | 'google'
+    authType: {
+      type: String,
+      enum: ['email', 'google'],
+      default: 'email',
+    },
   },
   {
     // タイムスタンプを自動管理

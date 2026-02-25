@@ -184,65 +184,6 @@ class ProfilePage extends StatelessWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 32),
-
-                  // ========================================
-                  // ログアウトボタン
-                  // ========================================
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // ログアウト確認ダイアログ
-                        showDialog(
-                          context: context,
-                          builder: (BuildContext context) => AlertDialog(
-                            title: const Text('ログアウト'),
-                            content: const Text('ログアウトしてもよろしいですか？'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                child: const Text('キャンセル'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  // 先にナビゲーション先を確保してからログアウト
-                                  final nav = Navigator.of(context);
-                                  authProvider.logout().then((_) {
-                                    nav.pushNamedAndRemoveUntil(
-                                      '/login',
-                                      (route) => false,
-                                    );
-                                  });
-                                },
-                                child: const Text(
-                                  'ログアウト',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[400],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12.0),
-                        child: Text(
-                          'ログアウト',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),

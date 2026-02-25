@@ -17,6 +17,7 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'fcm_service.dart';
 import 'e2ee_service.dart';
 
@@ -346,5 +347,73 @@ class AuthService {
   static Future<String?> getCurrentUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('currentUserId');
+  }
+
+  // ========================================
+  // Google OAuth ログイン
+  // ========================================
+  /// Google Sign-In でユーザーを認証し、バックエンドと連携
+  ///
+  /// 【処理フロー】
+  /// 1. Google Sign-In で認証
+  /// 2. ユーザー情報とメールを取得
+  /// 3. バックエンド POST /auth/google に送信
+  /// 4. トークンをローカルに保存
+  /// 5. E2EE キーペアを生成・アップロード
+  static Future<Map<String, dynamic>> loginWithGoogle() async {
+    try {
+      // Google Sign-In インスタンスを初期化
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+
+      // サインイン実行
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        throw 'Google ログインがキャンセルされました';
+      }
+
+      // Google ユーザー情報を取得
+      final String googleId = googleUser.id;
+      final String? email = googleUser.email;
+      final String displayName = googleUser.displayName ?? '';
+      final String? photoUrl = googleUser.photoUrl;
+
+      // バックエンドに Google 認証情報を送信
+      final response = await http.post(
+        Uri.parse('$BASE_URL/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'googleId': googleId,
+          'email': email,
+          'username': displayName,
+          'profileImage': photoUrl,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // トークンをローカルに保存
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('authToken', data['accessToken']);
+        await prefs.setString('refreshToken', data['refreshToken']);
+
+        // ユーザー ID をローカルに保存
+        final userId = data['user']?['id'] ?? data['user']?['_id'];
+        if (userId != null) await storeCurrentUserId(userId.toString());
+
+        // E2EE キーペア生成 & 公開鍵をサーバーにアップロード
+        await E2eeService.uploadPublicKey();
+
+        return data;
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw errorData['message'] ?? 'Google ログインに失敗しました';
+      }
+    } catch (e) {
+      // Google Sign-In をサインアウトして、エラーを再スロー
+      await GoogleSignIn().signOut();
+      throw e.toString();
+    }
   }
 }

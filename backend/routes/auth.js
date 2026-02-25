@@ -72,4 +72,11 @@ router.post('/forgot-password', authController.forgotPassword);
  */
 router.post('/reset-password/:token', authController.resetPassword);
 
+/**
+ * @route   POST /auth/google
+ * @desc    Google OAuth ログイン/登録
+ * @access  Public
+ */
+router.post('/google', authController.loginWithGoogle);
+
 module.exports = router;

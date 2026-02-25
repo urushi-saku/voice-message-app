@@ -20,6 +20,7 @@ describe('認証API (/auth)', () => {
     it('正しいデータで新規ユーザーを登録できる', async () => {
       const userData = {
         username: 'testuser',
+        handle: 'testuser',
         email: 'test@example.com',
         password: 'password123'
       };
@@ -57,6 +58,7 @@ describe('認証API (/auth)', () => {
       // 最初のユーザーを作成
       await User.create({
         username: 'testuser',
+        handle: 'testuser',
         email: 'test1@example.com',
         password: 'password123'
       });
@@ -66,6 +68,7 @@ describe('認証API (/auth)', () => {
         .post('/auth/register')
         .send({
           username: 'testuser',
+          handle: 'testuser2',
           email: 'test2@example.com',
           password: 'password123'
         })
@@ -79,6 +82,7 @@ describe('認証API (/auth)', () => {
       // 最初のユーザーを作成
       await User.create({
         username: 'testuser1',
+        handle: 'testuser1',
         email: 'test@example.com',
         password: 'password123'
       });
@@ -88,6 +92,7 @@ describe('認証API (/auth)', () => {
         .post('/auth/register')
         .send({
           username: 'testuser2',
+          handle: 'testuser2',
           email: 'test@example.com',
           password: 'password123'
         })
@@ -109,6 +114,7 @@ describe('認証API (/auth)', () => {
         .post('/auth/register')
         .send({
           username: 'testuser',
+          handle: 'testuser',
           email: 'test@example.com',
           password: 'password123'
         });
@@ -189,6 +195,7 @@ describe('認証API (/auth)', () => {
         .post('/auth/register')
         .send({
           username: 'testuser',
+          handle: 'testuser',
           email: 'test@example.com',
           password: 'password123'
         });

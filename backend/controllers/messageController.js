@@ -263,8 +263,13 @@ exports.getReceivedMessages = async (req, res) => {
       );
 
       return {
-        _id: msg._id,
-        sender: msg.sender,
+        _id: msg._id.toString(),
+        sender: {
+          _id: msg.sender._id.toString(),
+          username: msg.sender.username,
+          email: msg.sender.email,
+          profileImage: msg.sender.profileImage
+        },
         filePath: msg.filePath,
         fileSize: msg.fileSize,
         duration: msg.duration,
@@ -693,6 +698,9 @@ exports.getMessageThreads = async (req, res) => {
     const threadsMap = new Map();
 
     messages.forEach(message => {
+      // sender が削除済みで null の場合はスキップ
+      if (!message.sender || !message.sender._id) return;
+
       const senderId = message.sender._id.toString();
       const isMine = senderId === userId;
 
@@ -715,6 +723,7 @@ exports.getMessageThreads = async (req, res) => {
       if (!threadsMap.has(partnerId)) {
         // 未読数（受信したメッセージのみカウント）
         const unreadCount = messages.filter(m => {
+          if (!m.sender || !m.sender._id) return false;
           if (m.sender._id.toString() !== partnerId) return false;
           if (!m.receivers.some(r => r && r._id && r._id.toString() === userId)) return false;
           const rs = m.readStatus.find(rs => rs.user.toString() === userId);
@@ -722,6 +731,7 @@ exports.getMessageThreads = async (req, res) => {
         }).length;
 
         const totalCount = messages.filter(m => {
+          if (!m.sender || !m.sender._id) return false;
           const mid = m.sender._id.toString();
           const hasPartner = m.receivers.some(r => r && r._id && r._id.toString() === partnerId);
           const hasMe    = m.receivers.some(r => r && r._id && r._id.toString() === userId);
@@ -736,7 +746,7 @@ exports.getMessageThreads = async (req, res) => {
             profileImage: partnerProfileImage
           },
           lastMessage: {
-            _id: message._id,
+            _id: message._id.toString(),
             sentAt: message.sentAt,
             duration: message.duration,
             messageType: message.messageType || 'voice',
@@ -881,7 +891,9 @@ exports.getThreadMessages = async (req, res) => {
       .sort({ sentAt: 1 }); // 古い順（チャット表示用）
 
     const result = messages.map(message => {
-      const isMine = message.sender._id.toString() === userId;
+      const isMine = message.sender && message.sender._id
+        ? message.sender._id.toString() === userId
+        : false;
       let isRead, readAt;
       if (isMine) {
         // 自分が送ったメッセージ → 相手（partnerId）が既読したかを返す
@@ -899,11 +911,11 @@ exports.getThreadMessages = async (req, res) => {
         readAt = myStatus ? myStatus.readAt : null;
       }
       return {
-        _id: message._id,
+        _id: message._id.toString(),
         sender: {
-          _id: message.sender._id,
-          username: message.sender.username,
-          profileImage: message.sender.profileImage
+          _id: message.sender ? message.sender._id.toString() : null,
+          username: message.sender ? message.sender.username : null,
+          profileImage: message.sender ? message.sender.profileImage : null
         },
         isMine,
         messageType: message.messageType || 'voice',

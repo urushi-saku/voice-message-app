@@ -52,7 +52,9 @@ class _MessageThreadsScreenState extends State<MessageThreadsScreen> {
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        // "Exception: " プレフィックスを除去して表示
+        final msg = e.toString();
+        _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
         _isLoading = false;
       });
     }

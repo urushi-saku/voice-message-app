@@ -9,6 +9,12 @@ const mongoose = require('mongoose');
  * MongoDBに接続する関数
  */
 const connectDB = async () => {
+  // テスト環境では DB 接続をスキップ
+  if (process.env.NODE_ENV === 'test') {
+    console.log('⏭️  テスト環境のため、データベース接続をスキップします');
+    return;
+  }
+
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
       // Mongoose 6以降、以下のオプションはデフォルトで有効

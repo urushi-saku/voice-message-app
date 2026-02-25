@@ -47,7 +47,15 @@ exports.getUsers = async (req, res) => {
     ]);
 
     const result = {
-      users,
+      users: users.map(u => ({
+        _id: u._id.toString(),
+        username: u.username,
+        handle: u.handle,
+        profileImage: u.profileImage,
+        bio: u.bio,
+        followersCount: u.followersCount,
+        followingCount: u.followingCount,
+      })),
       pagination: {
         total,
         page,
@@ -295,7 +303,16 @@ exports.getFollowers = async (req, res) => {
       .sort({ followedAt: -1 }); // 新しい順
 
     // followerフィールドの情報のみを抽出
-    const followerList = followers.map(f => f.follower);
+    const followerList = followers.map(f => ({
+      _id: f.follower._id.toString(),
+      username: f.follower.username,
+      handle: f.follower.handle,
+      email: f.follower.email,
+      profileImage: f.follower.profileImage,
+      bio: f.follower.bio,
+      followersCount: f.follower.followersCount,
+      followingCount: f.follower.followingCount,
+    }));
 
     await cache.set(cacheKey, followerList, cache.TTL.FOLLOWERS);
     res.json(followerList);
@@ -333,7 +350,16 @@ exports.getFollowing = async (req, res) => {
       .sort({ followedAt: -1 }); // 新しい順
 
     // userフィールドの情報のみを抽出
-    const followingList = following.map(f => f.user);
+    const followingList = following.map(f => ({
+      _id: f.user._id.toString(),
+      username: f.user.username,
+      handle: f.user.handle,
+      email: f.user.email,
+      profileImage: f.user.profileImage,
+      bio: f.user.bio,
+      followersCount: f.user.followersCount,
+      followingCount: f.user.followingCount,
+    }));
 
     await cache.set(cacheKey, followingList, cache.TTL.FOLLOWERS);
     res.json(followingList);
@@ -364,8 +390,19 @@ exports.getUserById = async (req, res) => {
       return res.status(404).json({ error: 'ユーザーが見つかりません' });
     }
 
-    await cache.set(cacheKey, user, cache.TTL.USER);
-    res.json(user);
+    const userWithStringId = {
+      _id: user._id.toString(),
+      username: user.username,
+      handle: user.handle,
+      email: user.email,
+      profileImage: user.profileImage,
+      bio: user.bio,
+      followersCount: user.followersCount,
+      followingCount: user.followingCount,
+      createdAt: user.createdAt,
+    };
+    await cache.set(cacheKey, userWithStringId, cache.TTL.USER);
+    res.json(userWithStringId);
   } catch (error) {
     console.error('ユーザー詳細取得エラー:', error);
     res.status(500).json({ error: 'ユーザー情報の取得に失敗しました' });

@@ -62,29 +62,45 @@ exports.register = async (req, res) => {
     const { username, handle, email, password } = req.body;
 
     // 入力チェック
-    if (!username || !handle || !email || !password) {
+    if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'ユーザー名、ID、メールアドレス、パスワードは必須です',
+        message: 'ユーザー名、メールアドレス、パスワードは必須です',
       });
     }
 
-    // handleのフォーマットチェック
-    const handleLower = handle.toLowerCase().trim();
-    if (!/^[a-z0-9_]{3,20}$/.test(handleLower)) {
-      return res.status(400).json({
-        success: false,
-        message: 'IDは英小文字・数字・_の3〜20文字で入力してください',
-      });
-    }
+    // handle の生成（送信されていない場合はランダム生成）
+    const generateRandomHandle = async () => {
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      for (let attempt = 0; attempt < 10; attempt++) {
+        const suffix = Array.from({ length: 8 }, () =>
+          chars[Math.floor(Math.random() * chars.length)]
+        ).join('');
+        const candidate = `user_${suffix}`;
+        const exists = await User.findOne({ handle: candidate });
+        if (!exists) return candidate;
+      }
+      throw new Error('handleの生成に失敗しました');
+    };
 
-    // handleの重複チェック
-    const existingHandle = await User.findOne({ handle: handleLower });
-    if (existingHandle) {
-      return res.status(400).json({
-        success: false,
-        message: 'このIDは既に使用されています',
-      });
+    let handleLower;
+    if (handle) {
+      handleLower = handle.toLowerCase().trim();
+      if (!/^[a-z0-9_]{3,20}$/.test(handleLower)) {
+        return res.status(400).json({
+          success: false,
+          message: 'IDは英小文字・数字・_の3〜20文字で入力してください',
+        });
+      }
+      const existingHandle = await User.findOne({ handle: handleLower });
+      if (existingHandle) {
+        return res.status(400).json({
+          success: false,
+          message: 'このIDは既に使用されています',
+        });
+      }
+    } else {
+      handleLower = await generateRandomHandle();
     }
 
     // パスワードをハッシュ化
@@ -548,3 +564,94 @@ exports.resetPassword = async (req, res) => {
     });
   }
 };
+
+/**
+ * Google OAuth ログイン/登録
+ * POST /auth/google
+ */
+exports.loginWithGoogle = async (req, res) => {
+  try {
+    const { googleId, email, username, profileImage } = req.body;
+
+    if (!googleId || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google ID とメールアドレスは必須です',
+      });
+    }
+
+    // 既存ユーザーをチェック
+    let user = await User.findOne({ googleId });
+
+    // Google ID が登録されていない場合、メールアドレスで検索
+    if (!user) {
+      user = await User.findOne({ email });
+      if (user) {
+        // メールアドレスが既に登録されている場合、Google ID をリンク
+        user.googleId = googleId;
+        user.authType = 'google';
+        await user.save();
+      }
+    }
+
+    // 新規ユーザーの場合、登録処理を実行
+    if (!user) {
+      // ユニークなハンドルを生成
+      let handle = username
+        ? username.toLowerCase().replace(/[^a-z0-9_]/g, '_').substr(0, 20)
+        : email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_').substr(0, 20);
+
+      // ハンドルの重複をチェック
+      let existingUser = await User.findOne({ handle });
+      if (existingUser) {
+        handle = `${handle}_${crypto.randomBytes(3).toString('hex')}`;
+        handle = handle.substr(0, 20);
+      }
+
+      // 新規ユーザー作成
+      user = new User({
+        username: username || email.split('@')[0],
+        handle,
+        email,
+        googleId,
+        profileImage: profileImage || null,
+        authType: 'google',
+        password: crypto.randomBytes(16).toString('hex'), // OAuth 用ダミーパスワード
+      });
+      await user.save();
+    }
+
+    // トークン生成
+    const accessToken = generateAccessToken(user._id);
+    const refreshToken = generateRefreshToken();
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+    // リフレッシュトークンをDBに保存
+    user.refreshToken = refreshToken;
+    user.refreshTokenExpiresAt = refreshTokenExpiresAt;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Google ログインに成功しました',
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        handle: user.handle,
+        profileImage: user.profileImage,
+      },
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.error('Google ログインエラー:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Google ログインに失敗しました',
+      error: error.message,
+    });
+  }
+};
+
+

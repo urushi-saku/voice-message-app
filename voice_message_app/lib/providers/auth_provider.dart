@@ -22,6 +22,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
+import '../services/navigation_service.dart';
 
 /// ユーザー情報を表すクラス
 /// 【メンバー変数】
@@ -254,6 +255,35 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ========================================
+  // Google ログイン
+  // ========================================
+  /// Google Sign-In でログイン/登録し、AuthProvider の状態を更新
+  Future<bool> loginWithGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final result = await AuthService.loginWithGoogle();
+
+      _token = result['accessToken'] ?? result['token'];
+      _user = User.fromJson(result);
+      _isAuthenticated = true;
+      _isLoading = false;
+      notifyListeners();
+
+      // FCMトークンをサーバーに登録
+      FcmService.sendTokenAfterLogin();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========================================
   // ユーザー情報を再読み込み
   // ========================================
   /// サーバーからユーザー情報を再取得して保存
@@ -286,15 +316,17 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     try {
       await AuthService.logout();
-      _user = null;
-      _token = null;
-      _isAuthenticated = false;
-      _error = null;
-      notifyListeners();
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+    } catch (_) {
+      // ネットワークエラーでもローカル状態はリセットする
     }
+    _user = null;
+    _token = null;
+    _isAuthenticated = false;
+    _error = null;
+    notifyListeners();
+    // AuthWrapper がスタックにない場合も考慮し、ログイン画面へ強制遷移
+    NavigationService.navigator
+        ?.pushNamedAndRemoveUntil('/login', (route) => false);
   }
 
   // ========================================

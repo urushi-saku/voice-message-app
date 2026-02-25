@@ -292,9 +292,67 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
 
                 // ========================================
+                // またはの分割線
+                // ========================================
+                const SizedBox(height: 32),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[300])),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'または',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[300])),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // ========================================
+                // Google ログインボタン
+                // ========================================
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final authProvider =
+                          Provider.of<AuthProvider>(context, listen: false);
+                      final success = await authProvider.loginWithGoogle();
+                      if (mounted) {
+                        if (success) {
+                          Navigator.of(context).pushReplacementNamed('/home');
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  authProvider.error ?? 'Google ログインに失敗しました'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.g_mobiledata, size: 20),
+                    label: const Text(
+                      'Google でログイン',
+                      style: TextStyle(fontSize: 16, color: Colors.black87),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.grey[300]!),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ========================================
                 // 登録リンク
                 // ========================================
-                const SizedBox(height: 24),
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
