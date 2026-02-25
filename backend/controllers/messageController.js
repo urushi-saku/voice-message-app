@@ -149,9 +149,11 @@ exports.sendMessage = async (req, res) => {
 exports.sendTextMessage = async (req, res) => {
   try {
     const senderId = req.user.id;
-    const { receivers, textContent } = req.body;
+    // 'content' と 'textContent' 両方をサポート
+    const { receivers, textContent, content } = req.body;
+    const messageContent = textContent || content;
 
-    if (!textContent || !textContent.trim()) {
+    if (!messageContent || !messageContent.trim()) {
       return res.status(400).json({ error: 'テキストを入力してください' });
     }
     if (!receivers) {
@@ -169,6 +171,17 @@ exports.sendTextMessage = async (req, res) => {
       return res.status(400).json({ error: '受信者を少なくとも1人選択してください' });
     }
 
+    // フォロー確認（受信者が自分をフォローしているか確認）
+    const accessChecks = await Promise.all(
+      receiverIds.map(async (receiverId) => {
+        const follow = await Follower.findOne({ user: receiverId, follower: senderId });
+        return !!follow;
+      })
+    );
+    if (accessChecks.some(ok => !ok)) {
+      return res.status(403).json({ error: 'フォローしていないユーザーには送信できません' });
+    }
+
     const readStatus = receiverIds.map(id => ({
       user: id,
       isRead: false,
@@ -179,7 +192,7 @@ exports.sendTextMessage = async (req, res) => {
       sender: senderId,
       receivers: receiverIds,
       messageType: 'text',
-      textContent: textContent.trim(),
+      textContent: messageContent.trim(),
       readStatus,
       // =====================================
       // E2EE フィールド
@@ -202,7 +215,7 @@ exports.sendTextMessage = async (req, res) => {
     cache.invalidateUserMessages(senderId, receiverIds).catch(() => {});
 
     // レスポンスをすぐに返す（通知を待たない）
-    res.status(201).json({ message: 'テキストメッセージを送信しました', messageId: newMessage._id });
+    res.status(201).json({ success: true, message: 'テキストメッセージを送信しました', messageId: newMessage._id, data: { _id: newMessage._id } });
 
     // プッシュ通知はバックグラウンドで非同期送信
     const sender = await User.findById(senderId).select('username');
@@ -246,9 +259,7 @@ exports.getReceivedMessages = async (req, res) => {
     // キャッシュチェック
     const cacheKey = `received:${userId}`;
     const cached = await cache.get(cacheKey);
-    if (cached) return res.json(cached);
-
-    // 自分宛てのメッセージを検索
+    if (cached) return res.json(typeof cached === 'object' && cached.messages ? cached : { messages: cached });
     const messages = await Message.find({
       receivers: userId,
       isDeleted: false
@@ -281,7 +292,7 @@ exports.getReceivedMessages = async (req, res) => {
     });
 
     await cache.set(cacheKey, messagesWithReadStatus, cache.TTL.RECEIVED);
-    res.json(messagesWithReadStatus);
+    res.json({ messages: messagesWithReadStatus });
   } catch (error) {
     console.error('受信メッセージ取得エラー:', error);
     res.status(500).json({ error: '受信メッセージの取得に失敗しました' });
@@ -358,7 +369,7 @@ exports.markAsRead = async (req, res) => {
       );
     }
 
-    res.json({ message: '既読にしました' });
+    res.json({ success: true, message: '既読にしました' });
   } catch (error) {
     console.error('既読更新エラー:', error);
     res.status(500).json({ error: '既読更新に失敗しました' });
@@ -451,6 +462,7 @@ exports.deleteMessage = async (req, res) => {
       );
 
       return res.json({ 
+        success: true,
         message: 'メッセージを削除しました',
         physicallyDeleted: true
       });
@@ -466,6 +478,7 @@ exports.deleteMessage = async (req, res) => {
     );
 
     res.json({ 
+      success: true,
       message: 'メッセージを削除しました',
       physicallyDeleted: false
     });
@@ -680,9 +693,7 @@ exports.getMessageThreads = async (req, res) => {
     // キャッシュチェック
     const cacheKey = `threads:${userId}`;
     const cached = await cache.get(cacheKey);
-    if (cached) return res.json(cached);
-
-    // 自分が送信または受信したメッセージを全取得
+    if (cached) return res.json(typeof cached === 'object' && cached.threads ? cached : { threads: cached });
     const messages = await Message.find({
       isDeleted: false,
       $or: [
@@ -766,7 +777,7 @@ exports.getMessageThreads = async (req, res) => {
     );
 
     await cache.set(cacheKey, threads, cache.TTL.THREADS);
-    res.json(threads);
+    res.json({ threads });
   } catch (error) {
     console.error('スレッド一覧取得エラー:', error);
     res.status(500).json({ error: 'スレッド一覧の取得に失敗しました' });
@@ -806,12 +817,12 @@ exports.addReaction = async (req, res) => {
       return res.status(403).json({ error: 'このメッセージへのアクセス権がありません' });
     }
 
-    // 同じ絵文字が既にある場合はスキップ（トグル扱いではなく冪等）
+    // 同じ絵文字が既にある場合はエラー
     const alreadyReacted = message.reactions.some(
       r => r.emoji === emoji && r.userId.toString() === userId
     );
     if (alreadyReacted) {
-      return res.json({ message: 'すでにリアクション済みです', reactions: message.reactions });
+      return res.status(400).json({ error: '既に同じ絵文字でリアクション済みです' });
     }
 
     message.reactions.push({ emoji, userId, username });
@@ -823,7 +834,7 @@ exports.addReaction = async (req, res) => {
       userId: r.userId.toString(),
       username: r.username,
     }));
-    res.json({ message: 'リアクションを追加しました', reactions: reactionsOut });
+    res.status(201).json({ success: true, message: 'リアクションを追加しました', reactions: reactionsOut });
   } catch (error) {
     console.error('リアクション追加エラー:', error);
     res.status(500).json({ error: 'リアクションの追加に失敗しました' });
@@ -862,7 +873,7 @@ exports.removeReaction = async (req, res) => {
       userId: r.userId.toString(),
       username: r.username,
     }));
-    res.json({ message: 'リアクションを削除しました', reactions: reactionsOut });
+    res.json({ success: true, message: 'リアクションを削除しました', reactions: reactionsOut });
   } catch (error) {
     console.error('リアクション削除エラー:', error);
     res.status(500).json({ error: 'リアクションの削除に失敗しました' });
@@ -877,7 +888,7 @@ exports.getThreadMessages = async (req, res) => {
     // キャッシュチェック
     const cacheKey = `thread:${userId}:${partnerId}`;
     const cached = await cache.get(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return res.json(typeof cached === 'object' && cached.messages ? cached : { messages: cached });
 
     // 自分 → 相手、または 相手 → 自分のメッセージを取得
     const messages = await Message.find({
@@ -948,7 +959,7 @@ exports.getThreadMessages = async (req, res) => {
     });
 
     await cache.set(cacheKey, result, cache.TTL.THREAD_MSGS);
-    res.json(result);
+    res.json({ messages: result });
   } catch (error) {
     console.error('スレッドメッセージ取得エラー:', error);
     res.status(500).json({ error: 'メッセージの取得に失敗しました' });

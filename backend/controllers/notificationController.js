@@ -184,7 +184,7 @@ exports.deleteNotification = async (req, res) => {
 
     await Notification.deleteOne({ _id: notificationId });
 
-    res.json({ message: '通知を削除しました' });
+    res.json({ success: true, message: '通知を削除しました' });
   } catch (error) {
     console.error('通知削除エラー:', error);
     res.status(500).json({ error: '通知の削除に失敗しました' });
@@ -219,7 +219,7 @@ exports.markNotificationAsRead = async (req, res) => {
     notification.readAt = new Date();
     await notification.save();
 
-    res.json({ message: '通知を既読にしました' });
+    res.json({ success: true, message: '通知を既読にしました' });
   } catch (error) {
     console.error('通知既読エラー:', error);
     res.status(500).json({ error: '既読の更新に失敗しました' });
@@ -240,7 +240,7 @@ exports.markAllNotificationsAsRead = async (req, res) => {
       { $set: { isRead: true, readAt: new Date() } }
     );
 
-    res.json({ message: `${result.modifiedCount} 件の通知を既読にしました` });
+    res.json({ success: true, message: `${result.modifiedCount} 件の通知を既読にしました` });
   } catch (error) {
     console.error('全通知既読エラー:', error);
     res.status(500).json({ error: '既読の更新に失敗しました' });

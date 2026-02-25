@@ -127,7 +127,7 @@ exports.deleteAccount = async (req, res) => {
     // ユーザー本体を削除
     await User.findByIdAndDelete(currentUserId);
 
-    res.json({ message: 'アカウントを削除しました' });
+    res.json({ success: true, message: 'アカウントを削除しました' });
   } catch (error) {
     console.error('アカウント削除エラー:', error);
     res.status(500).json({ error: 'アカウントの削除に失敗しました' });
@@ -222,7 +222,7 @@ exports.followUser = async (req, res) => {
       `user:${currentUserId}`,
     );
 
-    res.status(201).json({ message: 'フォローしました' });
+    res.status(200).json({ success: true, message: 'フォローしました' });
   } catch (error) {
     console.error('フォローエラー:', error);
     res.status(500).json({ error: 'フォローに失敗しました' });
@@ -268,7 +268,7 @@ exports.unfollowUser = async (req, res) => {
       `user:${currentUserId}`,
     );
 
-    res.json({ message: 'フォローを解除しました' });
+    res.json({ success: true, message: 'フォローを解除しました' });
   } catch (error) {
     console.error('フォロー解除エラー:', error);
     res.status(500).json({ error: 'フォロー解除に失敗しました' });

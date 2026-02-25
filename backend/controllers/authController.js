@@ -65,7 +65,28 @@ exports.register = async (req, res) => {
     if (!username || !email || !password) {
       return res.status(400).json({
         success: false,
+        error: 'ユーザー名、メールアドレス、パスワードは必須です',
         message: 'ユーザー名、メールアドレス、パスワードは必須です',
+      });
+    }
+
+    // 重複するusernameをチェック
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({
+        success: false,
+        error: 'usernameは既に存在します',
+        message: 'usernameは既に存在します',
+      });
+    }
+
+    // 重複するemailをチェック
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        error: 'emailは既に存在します',
+        message: 'emailは既に存在します',
       });
     }
 
@@ -89,6 +110,7 @@ exports.register = async (req, res) => {
       if (!/^[a-z0-9_]{3,20}$/.test(handleLower)) {
         return res.status(400).json({
           success: false,
+          error: 'IDは英小文字・数字・_の3〜20文字で入力してください',
           message: 'IDは英小文字・数字・_の3〜20文字で入力してください',
         });
       }
@@ -96,6 +118,7 @@ exports.register = async (req, res) => {
       if (existingHandle) {
         return res.status(400).json({
           success: false,
+          error: 'このIDは既に使用されています',
           message: 'このIDは既に使用されています',
         });
       }
@@ -132,25 +155,23 @@ exports.register = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'ユーザー登録が完了しました',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          handle: user.handle,
-          email: user.email,
-          profileImage: user.profileImage,
-          bio: user.bio,
-        },
-        token,
-        refreshToken,
+      token,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        handle: user.handle,
+        email: user.email,
+        profileImage: user.profileImage,
+        bio: user.bio,
       },
     });
   } catch (error) {
     console.error('登録エラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -167,6 +188,7 @@ exports.login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
+        error: 'メールアドレスとパスワードを入力してください',
         message: 'メールアドレスとパスワードを入力してください',
       });
     }
@@ -176,6 +198,7 @@ exports.login = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
+        error: 'メールアドレスまたはパスワードが正しくありません',
         message: 'メールアドレスまたはパスワードが正しくありません',
       });
     }
@@ -185,6 +208,7 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
+        error: 'メールアドレスまたはパスワードが正しくありません',
         message: 'メールアドレスまたはパスワードが正しくありません',
       });
     }
@@ -206,25 +230,25 @@ exports.login = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'ログインに成功しました',
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,          handle: user.handle,          email: user.email,
-          profileImage: user.profileImage,
-          bio: user.bio,
-          followersCount: user.followersCount,
-          followingCount: user.followingCount,
-        },
-        token,
-        refreshToken,
+      token,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        handle: user.handle,
+        email: user.email,
+        profileImage: user.profileImage,
+        bio: user.bio,
+        followersCount: user.followersCount,
+        followingCount: user.followingCount,
       },
     });
   } catch (error) {
     console.error('ログインエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -240,25 +264,21 @@ exports.getMe = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        user: {
-          id: user._id,
-          username: user.username,
-          handle: user.handle,
-          email: user.email,
-          profileImage: user.profileImage,
-          bio: user.bio,
-          followersCount: user.followersCount,
-          followingCount: user.followingCount,
-        },
-      },
+      id: user._id,
+      username: user.username,
+      handle: user.handle,
+      email: user.email,
+      profileImage: user.profileImage,
+      bio: user.bio,
+      followersCount: user.followersCount,
+      followingCount: user.followingCount,
     });
   } catch (error) {
     console.error('ユーザー情報取得エラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -284,6 +304,7 @@ exports.updateFcmToken = async (req, res) => {
     if (!fcmToken) {
       return res.status(400).json({
         success: false,
+        error: 'FCMトークンは必須です',
         message: 'FCMトークンは必須です',
       });
     }
@@ -307,8 +328,8 @@ exports.updateFcmToken = async (req, res) => {
     console.error('FCMトークン更新エラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -338,8 +359,8 @@ exports.logout = async (req, res) => {
     console.error('ログアウトエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -358,6 +379,7 @@ exports.refresh = async (req, res) => {
     if (!refreshToken) {
       return res.status(400).json({
         success: false,
+        error: 'リフレッシュトークンは必須です',
         message: 'リフレッシュトークンは必須です',
       });
     }
@@ -376,6 +398,7 @@ exports.refresh = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
+        error: 'リフレッシュトークンが無効または期限切れです',
         message: 'リフレッシュトークンが無効または期限切れです',
       });
     }
@@ -406,8 +429,8 @@ exports.refresh = async (req, res) => {
     console.error('トークンリフレッシュエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -425,6 +448,7 @@ exports.forgotPassword = async (req, res) => {
     if (!email) {
       return res.status(400).json({
         success: false,
+        error: 'メールアドレスは必須です',
         message: 'メールアドレスは必須です',
       });
     }
@@ -487,8 +511,8 @@ exports.forgotPassword = async (req, res) => {
     console.error('パスワードリセットリクエストエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -507,6 +531,7 @@ exports.resetPassword = async (req, res) => {
     if (!password) {
       return res.status(400).json({
         success: false,
+        error: '新しいパスワードを入力してください',
         message: '新しいパスワードを入力してください',
       });
     }
@@ -514,6 +539,7 @@ exports.resetPassword = async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
+        error: 'パスワードは6文字以上で設定してください',
         message: 'パスワードは6文字以上で設定してください',
       });
     }
@@ -532,6 +558,8 @@ exports.resetPassword = async (req, res) => {
     if (!user) {
       return res.status(400).json({
         success: false,
+        error:
+          'パスワードリセットトークンが無効または期限切れです。再度リクエストしてください',
         message:
           'パスワードリセットトークンが無効または期限切れです。再度リクエストしてください',
       });
@@ -559,8 +587,8 @@ exports.resetPassword = async (req, res) => {
     console.error('パスワードリセットエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'サーバーエラーが発生しました',
       message: 'サーバーエラーが発生しました',
-      error: error.message,
     });
   }
 };
@@ -576,6 +604,7 @@ exports.loginWithGoogle = async (req, res) => {
     if (!googleId || !email) {
       return res.status(400).json({
         success: false,
+        error: 'Google ID とメールアドレスは必須です',
         message: 'Google ID とメールアドレスは必須です',
       });
     }
@@ -648,8 +677,8 @@ exports.loginWithGoogle = async (req, res) => {
     console.error('Google ログインエラー:', error);
     res.status(500).json({
       success: false,
+      error: 'Google ログインに失敗しました',
       message: 'Google ログインに失敗しました',
-      error: error.message,
     });
   }
 };

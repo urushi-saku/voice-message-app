@@ -4,6 +4,7 @@
 // ユーザー情報を管理するMongooseスキーマ
 
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema(
   {
@@ -161,6 +162,21 @@ userSchema.set('toJSON', {
     delete ret.password;
     return ret;
   },
+});
+
+// パスワードの自動ハッシュ化（save時）
+userSchema.pre('save', async function () {
+  // パスワードが変更されていない場合はスキップ
+  if (!this.isModified('password')) {
+    return;
+  }
+
+  // パスワードがプレーンテキストの場合のみハッシュ化
+  // （既にハッシュ化されている可能性がある場合の対応）
+  if (!this.password.startsWith('$2a$') && !this.password.startsWith('$2b$')) {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
 });
 
 const User = mongoose.model('User', userSchema);

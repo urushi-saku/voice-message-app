@@ -148,6 +148,7 @@ exports.createGroup = async (req, res) => {
     ]);
 
     res.status(201).json({
+      success: true,
       message: 'グループを作成しました',
       group: populated,
     });
@@ -197,7 +198,7 @@ exports.updateGroup = async (req, res) => {
       { path: 'members', select: 'username handle profileImage' },
     ]);
 
-    res.json({ message: 'グループを更新しました', group: populated });
+    res.json({ success: true, message: 'グループを更新しました', group: populated });
   } catch (error) {
     console.error('グループ更新エラー:', error);
     res.status(500).json({ error: 'グループの更新に失敗しました' });
@@ -242,7 +243,7 @@ exports.deleteGroup = async (req, res) => {
     // グループを削除
     await Group.findByIdAndDelete(id);
 
-    res.json({ message: 'グループを削除しました' });
+    res.json({ success: true, message: 'グループを削除しました' });
   } catch (error) {
     console.error('グループ削除エラー:', error);
     res.status(500).json({ error: 'グループの削除に失敗しました' });
@@ -288,7 +289,7 @@ exports.addMember = async (req, res) => {
     group.members.push(userId);
     await group.save();
 
-    res.json({ message: `${user.username} をグループに追加しました` });
+    res.json({ success: true, message: `${user.username} をグループに追加しました` });
   } catch (error) {
     console.error('メンバー追加エラー:', error);
     res.status(500).json({ error: 'メンバーの追加に失敗しました' });
@@ -325,7 +326,7 @@ exports.removeMember = async (req, res) => {
     group.members = group.members.filter((m) => m.toString() !== userId);
     await group.save();
 
-    res.json({ message: 'メンバーをグループから削除しました' });
+    res.json({ success: true, message: 'メンバーをグループから削除しました' });
   } catch (error) {
     console.error('メンバー削除エラー:', error);
     res.status(500).json({ error: 'メンバーの削除に失敗しました' });

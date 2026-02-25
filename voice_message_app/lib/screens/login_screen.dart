@@ -318,8 +318,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 48,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final authProvider =
-                          Provider.of<AuthProvider>(context, listen: false);
+                      final authProvider = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
                       final success = await authProvider.loginWithGoogle();
                       if (mounted) {
                         if (success) {
@@ -328,7 +330,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                  authProvider.error ?? 'Google ログインに失敗しました'),
+                                authProvider.error ?? 'Google ログインに失敗しました',
+                              ),
                               backgroundColor: Colors.red,
                             ),
                           );

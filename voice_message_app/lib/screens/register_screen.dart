@@ -36,8 +36,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static String _generateRandomHandle() {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final rand = Random.secure();
-    final suffix =
-        List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+    final suffix = List.generate(
+      8,
+      (_) => chars[rand.nextInt(chars.length)],
+    ).join();
     return 'user_$suffix';
   }
 
@@ -357,8 +359,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   height: 48,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final authProvider =
-                          Provider.of<AuthProvider>(context, listen: false);
+                      final authProvider = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
                       final success = await authProvider.loginWithGoogle();
                       if (mounted) {
                         if (success) {
@@ -367,7 +371,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                  authProvider.error ?? 'Google 登録に失敗しました'),
+                                authProvider.error ?? 'Google 登録に失敗しました',
+                              ),
                               backgroundColor: Colors.red,
                             ),
                           );

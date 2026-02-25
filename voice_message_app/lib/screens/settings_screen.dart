@@ -220,10 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text(
-                'ログアウト',
-                style: TextStyle(color: Colors.red),
-              ),
+              title: const Text('ログアウト', style: TextStyle(color: Colors.red)),
               onTap: () async {
                 final confirmed = await showDialog<bool>(
                   context: context,
@@ -238,7 +235,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: TextButton.styleFrom(
-                            foregroundColor: Colors.red),
+                          foregroundColor: Colors.red,
+                        ),
                         child: const Text('ログアウト'),
                       ),
                     ],

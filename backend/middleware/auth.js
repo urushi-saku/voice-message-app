@@ -25,6 +25,7 @@ const protect = async (req, res, next) => {
   if (!token) {
     return res.status(401).json({
       success: false,
+      error: '認証トークンがありません',
       message: '認証トークンがありません',
     });
   }
@@ -39,6 +40,7 @@ const protect = async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
+        error: 'ユーザーが見つかりません',
         message: 'ユーザーが見つかりません',
       });
     }
@@ -48,6 +50,7 @@ const protect = async (req, res, next) => {
     console.error('認証エラー:', error);
     return res.status(401).json({
       success: false,
+      error: 'トークンが無効です',
       message: 'トークンが無効です',
     });
   }
