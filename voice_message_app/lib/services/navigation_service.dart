@@ -97,9 +97,7 @@ class NavigationService {
 
         if (user != null) {
           navigator?.push(
-            MaterialPageRoute(
-              builder: (_) => UserProfileScreen(user: user),
-            ),
+            MaterialPageRoute(builder: (_) => UserProfileScreen(user: user)),
           );
         }
       });

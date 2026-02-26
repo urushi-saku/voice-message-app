@@ -179,7 +179,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     // 少し待って（スプラッシュを見せる最低限の時間）AuthWrapperへ
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 3000));
 
     if (mounted) {
       Navigator.of(

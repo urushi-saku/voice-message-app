@@ -290,9 +290,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('本当に削除しますか？'),
-                    content: const Text(
-                      '最終確認です。アカウントを完全に削除します。',
-                    ),
+                    content: const Text('最終確認です。アカウントを完全に削除します。'),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),

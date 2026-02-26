@@ -32,7 +32,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     
     <application
-        android:label="voice_message_app"
+        android:label="Vio"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
