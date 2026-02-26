@@ -209,11 +209,13 @@ if (process.env.NODE_ENV !== 'test') {
 const shutdown = async (signal, exitCode = 0) => {
   console.log(`\n🛑 ${signal} を受信 — Graceful Shutdown を開始します...`);
 
-  // 強制終了タイマー（10 秒後に強制 exit）
+  // 強制終了タイマー（9.5 秒後に強制 exit）
+  // 「Cloud Run のデフォルトタイムアウト（10秒）」より0.5秒早く終了させることで
+  // Sentry へのログ送信を確保し、Google から SIGKILL される前に自分で終了する
   const forceExit = setTimeout(() => {
     console.error('⏰ シャットダウンがタイムアウト — 強制終了します');
     process.exit(1);
-  }, 10_000);
+  }, 9_500); // 9.5秒（Cloud Run 10s より短く）
   forceExit.unref(); // タイマーだけが残ってもプロセスを維持しない
 
   try {

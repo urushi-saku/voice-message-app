@@ -159,6 +159,9 @@ jobs:
             --cpu=1
             --timeout=60s
             --concurrency=80
+            # GCP Memorystore (Redis) を使う場合のみ以下を有効化
+            # --vpc-connector=${{ secrets.GCP_VPC_CONNECTOR }}
+            # --vpc-egress=all
 
       # 8. デプロイ結果をサマリーに出力
       - name: Show deployed URL
@@ -246,3 +249,42 @@ jobs:
 #    echo -n "YOUR_JWT_SECRET"   | gcloud secrets create vio-jwt-secret   --data-file=-
 #    echo -n "YOUR_MONGODB_URI"  | gcloud secrets create vio-mongodb-uri  --data-file=-
 #    echo -n "YOUR_REDIS_HOST"   | gcloud secrets create vio-redis-host   --data-file=-
+#
+# ⚠️  Redis 接続時の設定（GCP Memorystore の場合）
+# ────────────────────────────────────────────
+# ❌ 【地味な落とし穴】
+#    GCP Memorystore の Redis はプライベート IP でしかアクセス不可。
+#    Cloud Run を同じ VPC に置かないと「接続に失敗する」が、
+#    その場はスルーして「本番環境に出したら謎のタイムアウト」になる。
+#
+# ✅ 【回避策】
+#    以下の2つのうち1つを選ぶ:
+#
+#    【方法 A】Serverless VPC Connector（推奨・価格安い）
+#      1. VPC Connector を作成:
+#         gcloud compute networks vpc-accessors create vio-vpc-conn \
+#           --network=default \
+#           --region=asia-northeast1 \
+#           --subnet=default
+#
+#      2. deploy.yml の flags に以下を追加:
+#         --vpc-connector=vio-vpc-conn
+#         --vpc-egress=all
+#
+#      3. GitHub Secrets に登録:
+#         GCP_VPC_CONNECTOR=vio-vpc-conn
+#
+#      4. deploy.yml の flags を有効化（上記のコメント行を外す）
+#
+#    【方法 B】Redis Cloud / Upstash（外部サービス）
+#      インターネット経由でアクセス可能 → VPC 設定不要
+#      ただし追加コスト発生
+#
+# 【Graceful Shutdown の時間設定】
+# ────────────────────────────────────────────
+# app.js の forceExit タイムアウト: 9500ms（9.5秒）
+# Cloud Run のデフォルト SIGKILL タイムアウト: 10000ms（10秒）
+#
+# 理由: Cloud Run が「時間切れだからKill」するより0.5秒早く終了させることで、
+#       Sentry への最後のログ送信を確保する。同じ10秒だと「自分で終了しようとした瞬間に
+#       Googleから電源オフされる」リスクがある。

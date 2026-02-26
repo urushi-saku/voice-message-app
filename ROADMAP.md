@@ -294,9 +294,11 @@ voice-message-app/
     - デプロイ結果（URL・イメージ・コミット SHA）を Job Summary に出力
     - `workflow_dispatch` で手動トリガー・タグ指定デプロイも対応
     - GCP セットアップ手順を deploy.yml 末尾にコメントで完全記載
-- Graceful Shutdown 実装（`app.js`）
+    - **VPC Connector オプション** — GCP Memorystore (Redis) 使用時のオプション記載
+- Graceful Shutdown アップグレード（`app.js`）
   - SIGTERM / SIGINT で `server.close()` → `mongoose.close()` → `redis.quit()` → `Sentry.close()` の順に安全終了
-  - 10秒タイムアウトでハングアップ防止
+  - タイムアウト: **9500ms（9.5秒）**に短縮
+    - 理由: Cloud Run のデフォルト SIGKILL タイムアウト（10秒）より0.5秒早く自分から終了 → Sentry ログ送信を確保
 
 ### 2026-02-26
 - Docker コンテナ化実装（「自分のPCでは動いたのに…」を撲滅）
