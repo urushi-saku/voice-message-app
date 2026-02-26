@@ -250,6 +250,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
 
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text(
+                'アカウントを削除',
+                style: TextStyle(color: Colors.red),
+              ),
+              onTap: () async {
+                // 1回目の確認
+                final step1 = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('アカウントを削除'),
+                    content: const Text(
+                      'アカウントを削除すると、メッセージやフォロー情報など'
+                      'すべてのデータが完全に失われます。\n\nこの操作は取り消せません。',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('次へ'),
+                      ),
+                    ],
+                  ),
+                );
+                if (step1 != true || !mounted) return;
+
+                // 2回目の確認（最終確認）
+                final step2 = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('本当に削除しますか？'),
+                    content: const Text(
+                      '最終確認です。アカウントを完全に削除します。',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('キャンセル'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: const Text('削除する'),
+                      ),
+                    ],
+                  ),
+                );
+                if (step2 != true || !mounted) return;
+
+                try {
+                  await context.read<AuthProvider>().deleteAccount();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('削除に失敗しました: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          ),
+
           const SizedBox(height: 24),
 
           // ========================================

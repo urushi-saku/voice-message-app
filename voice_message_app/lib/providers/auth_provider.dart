@@ -23,6 +23,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/fcm_service.dart';
 import '../services/navigation_service.dart';
+import '../services/user_service.dart';
 
 /// ユーザー情報を表すクラス
 /// 【メンバー変数】
@@ -329,6 +330,28 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     // AuthWrapper がスタックにない場合も考慮し、ログイン画面へ強制遷移
+    NavigationService.navigator?.pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
+  }
+
+  // ========================================
+  // アカウント削除
+  // ========================================
+  /// 自分のアカウントをサーバーから完全削除し、ローカル状態もリセットする
+  Future<void> deleteAccount() async {
+    if (_user == null) throw Exception('ユーザー情報がありません');
+    await UserService.deleteAccount(_user!.id);
+    // ローカル状態をリセット（logout と同じ後処理）
+    try {
+      await AuthService.logout();
+    } catch (_) {}
+    _user = null;
+    _token = null;
+    _isAuthenticated = false;
+    _error = null;
+    notifyListeners();
     NavigationService.navigator?.pushNamedAndRemoveUntil(
       '/login',
       (route) => false,
