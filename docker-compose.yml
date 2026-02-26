@@ -69,8 +69,8 @@ services:
       # コンテナ内サービスの接続先を上書き
       # .env.docker に MONGODB_URI が設定されていない場合のデフォルト
       MONGODB_URI: mongodb://${MONGO_ROOT_USER:-vio}:${MONGO_ROOT_PASSWORD:-viopassword}@mongo:27017/voice_message_app?authSource=admin
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      # Redis URL (docker-compose 内部ネットワークを使用)
+      REDIS_URL: redis://redis:6379
       NODE_ENV: ${NODE_ENV:-production}
     ports:
       - "3000:3000"

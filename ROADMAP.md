@@ -284,6 +284,17 @@ voice-message-app/
 ## 更新履歴
 
 ### 2026-02-26
+- **【重要】Redis SSL/TLS 接続対応**（Upstash 本番環境向け）
+  - `backend/config/redis.js`: REDIS_URL 接続文字列対応に全面刷新
+    - `REDIS_URL` が設定されていれば優先（Upstash 用）
+    - `REDIS_URL` がなければ `REDIS_HOST/PORT/PASSWORD` で構成（ローカル開発用）
+    - `rediss://` (s付き) を自動検出して TLS オプションを明示的に設定
+    - `rejectUnauthorized: false` で証明書エラーに対応
+    - Cloud Run のコールドスタート対策として retryStrategy を調整（最大6回、50ms～2000ms）
+  - `.env.example` / `.env.docker.example`: REDIS_URL 形式で統一
+    - ローカル: `REDIS_URL=redis://redis:6379`
+    - Upstash: `REDIS_URL=rediss://default:PASSWORD@hostname:6379`
+  - `docker-compose.yml`: REDIS_HOST/PORT → `REDIS_URL=redis://redis:6379` に更新
 - CI/CD パイプライン実装（GitHub Actions + GCP Cloud Run）
   - `.github/workflows/ci.yml`: PR・push 時にバックエンドユニットテストを自動実行
     - Node.js 20.x、`npm ci` キャッシュ、カバレッジレポートをアーティファクト保存
