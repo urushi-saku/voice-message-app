@@ -20,6 +20,7 @@ const _kQuickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 /// - onPlayback: 再生ボタンタップ時コールバック
 /// - onDelete: 削除確定後に呼ばれる非同期処理（MessageProvider.deleteMessage など）
 /// - onReactionTap: 絵文字タップ時コールバック（emoji を渡す）
+/// - onDownload: ダウンロードボタンタップ時コールバック（voiceのみ表示）
 Future<void> showMessageOptionsSheet({
   required BuildContext context,
   required MessageInfo message,
@@ -27,6 +28,7 @@ Future<void> showMessageOptionsSheet({
   required Future<void> Function() onDelete,
   String currentUserId = '',
   void Function(String emoji)? onReactionTap,
+  VoidCallback? onDownload,
 }) async {
   await showModalBottomSheet(
     context: context,
@@ -120,6 +122,19 @@ Future<void> showMessageOptionsSheet({
                 onTap: () {
                   Navigator.pop(sheetCtx);
                   onPlayback();
+                },
+              ),
+            // ---- ボイスのみ: ダウンロード ----
+            if (message.messageType == 'voice' && onDownload != null)
+              ListTile(
+                leading: const Icon(
+                  Icons.download_rounded,
+                  color: Color(0xFF7C4DFF),
+                ),
+                title: const Text('ダウンロード'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  onDownload();
                 },
               ),
             // ---- 削除 / 送信取り消し ----

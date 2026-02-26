@@ -14,9 +14,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import '../models/message.dart';
 import '../providers/auth_provider.dart';
 import '../providers/message_provider.dart';
+import '../services/message_service.dart';
 import '../services/user_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/message_options_sheet.dart';
@@ -173,6 +176,59 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       context,
       MaterialPageRoute(builder: (_) => VoicePlaybackScreen(message: message)),
     );
+  }
+
+  // ========================================
+  // ボイスメッセージをDownloadsフォルダに保存
+  // ========================================
+  Future<void> _downloadVoiceMessage(MessageInfo message) async {
+    try {
+      // 一時ディレクトリにダウンロード
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = '${tempDir.path}/${message.id}.m4a';
+      final tempFile = File(tempPath);
+      if (!await tempFile.exists()) {
+        await MessageService.downloadMessage(
+          messageId: message.id,
+          savePath: tempPath,
+          messageInfo: message,
+        );
+      }
+
+      // Downloadsフォルダへコピー
+      Directory? dir;
+      try {
+        dir = await getDownloadsDirectory();
+      } catch (_) {}
+      dir ??= await getApplicationDocumentsDirectory();
+
+      final sentAt = message.sentAt;
+      final stamp =
+          '${sentAt.year}${sentAt.month.toString().padLeft(2, '0')}${sentAt.day.toString().padLeft(2, '0')}_'
+          '${sentAt.hour.toString().padLeft(2, '0')}${sentAt.minute.toString().padLeft(2, '0')}${sentAt.second.toString().padLeft(2, '0')}';
+      final fileName = 'voice_${message.senderUsername}_$stamp.m4a';
+      final savePath = '${dir.path}/$fileName';
+      await tempFile.copy(savePath);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ダウンロードしました\n$savePath'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ダウンロードに失敗しました: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _openRecording() {
@@ -386,6 +442,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                       message.id,
                       widget.senderId,
                     ),
+                    onDownload: message.messageType == 'voice'
+                        ? () => _downloadVoiceMessage(message)
+                        : null,
                   ),
                   onAvatarTap: _openSenderProfile,
                   onPlaybackTap: () => _openPlayback(message),
