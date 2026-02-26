@@ -1,0 +1,248 @@
+# ========================================
+# CD — GCP Cloud Run デプロイ
+# ========================================
+# トリガー: main ブランチへの push（backend/ 配下の変更のみ）
+# 認証方式: Workload Identity Federation (OIDC) — Service Account Key 不要
+#
+# 事前に GCP 側で以下の設定が必要（下部の「GCP セットアップ手順」参照）:
+#   - Workload Identity Pool / Provider の作成
+#   - Cloud Run, Artifact Registry, IAM の API 有効化
+#   - 必要な GitHub Secrets の登録
+# ========================================
+
+name: CD — Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "docker-compose.yml"
+      - ".github/workflows/deploy.yml"
+
+  # 手動トリガー（緊急ロールバック等に使用）
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "デプロイするイメージタグ（省略時は最新ビルド）"
+        required: false
+        default: ""
+
+# 同一ブランチへの複数 push が重なった場合、前のデプロイをキャンセル
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # GCP プロジェクト設定（GitHub Secrets で管理）
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}           # 例: asia-northeast1
+  SERVICE_NAME: ${{ secrets.GCP_SERVICE_NAME }} # 例: vio-backend
+  # Artifact Registry リポジトリ（例: asia-northeast1-docker.pkg.dev/PROJECT/vio）
+  REGISTRY: ${{ secrets.GCP_ARTIFACT_REGISTRY }}
+
+jobs:
+  # ── ジョブ 1: テスト（デプロイ前に必ずパスさせる） ─────────────
+  test:
+    name: Pre-deploy Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --frozen-lockfile
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          JWT_SECRET: test_jwt_secret_for_ci_only
+          MONGODB_URI: mongodb://localhost:27017/test_db
+        run: npm test
+
+  # ── ジョブ 2: ビルド & デプロイ ────────────────────────────────
+  deploy:
+    name: Build & Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    needs: test # テスト通過後のみ実行
+
+    # Workload Identity Federation に必要な permissions
+    permissions:
+      contents: read
+      id-token: write # OIDC トークンを GitHub Actions が発行するために必要
+
+    steps:
+      # 1. コードチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Workload Identity Federation で GCP 認証
+      #    Service Account Key (JSON) を使わない安全な認証方式
+      #    OIDC により、このリポジトリからのリクエストのみを許可できる
+      - name: Authenticate to Google Cloud (OIDC)
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          # GitHub Secrets に登録した Workload Identity Provider のリソース名
+          # 形式: projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL/providers/PROVIDER
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          # デプロイ操作を委譲するサービスアカウントのメール
+          # 形式: SERVICE_ACCOUNT@PROJECT_ID.iam.gserviceaccount.com
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      # 3. Docker が Artifact Registry へ push できるよう認証設定
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # 4. イメージタグを決定（SHA ベース + latest）
+      - name: Set image tag
+        id: tag
+        run: |
+          # 手動トリガー時は指定タグ、それ以外はコミット SHA（先頭7文字）
+          if [[ -n "${{ github.event.inputs.image_tag }}" ]]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "image=${{ env.REGISTRY }}/${{ env.SERVICE_NAME }}" >> "$GITHUB_OUTPUT"
+
+      # 5. Docker イメージをマルチステージビルドで構築
+      - name: Build Docker image
+        run: |
+          docker build \
+            --file backend/Dockerfile \
+            --tag "${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}" \
+            --tag "${{ steps.tag.outputs.image }}:latest" \
+            --cache-from "${{ steps.tag.outputs.image }}:latest" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            backend/
+        env:
+          DOCKER_BUILDKIT: "1"
+
+      # 6. Artifact Registry へ push
+      - name: Push image to Artifact Registry
+        run: |
+          docker push "${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}"
+          docker push "${{ steps.tag.outputs.image }}:latest"
+
+      # 7. Cloud Run へデプロイ
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+          # 環境変数は Cloud Run のシークレット/環境変数として設定する
+          # （.env をイメージに含めない）
+          env_vars: |
+            NODE_ENV=production
+            PORT=3000
+          # Cloud Run のシークレットを環境変数にマウント
+          secrets: |
+            JWT_SECRET=vio-jwt-secret:latest
+            MONGODB_URI=vio-mongodb-uri:latest
+            REDIS_HOST=vio-redis-host:latest
+          flags: |
+            --allow-unauthenticated
+            --min-instances=0
+            --max-instances=10
+            --memory=512Mi
+            --cpu=1
+            --timeout=60s
+            --concurrency=80
+
+      # 8. デプロイ結果をサマリーに出力
+      - name: Show deployed URL
+        run: |
+          echo "## ✅ デプロイ完了" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 項目 | 値 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|------|-----|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| URL | ${{ steps.deploy.outputs.url }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| イメージ | \`${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| コミット | \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| デプロイ者 | ${{ github.actor }} |" >> "$GITHUB_STEP_SUMMARY"
+
+# ========================================
+# GCP セットアップ手順
+# ========================================
+#
+# 1. API 有効化
+#    gcloud services enable \
+#      run.googleapis.com \
+#      artifactregistry.googleapis.com \
+#      iam.googleapis.com \
+#      iamcredentials.googleapis.com \
+#      cloudresourcemanager.googleapis.com
+#
+# 2. Artifact Registry リポジトリ作成
+#    gcloud artifacts repositories create vio \
+#      --repository-format=docker \
+#      --location=asia-northeast1
+#
+# 3. サービスアカウント作成
+#    gcloud iam service-accounts create vio-deployer \
+#      --display-name="Vio GitHub Actions Deployer"
+#
+# 4. サービスアカウントに権限付与
+#    PROJECT_ID=$(gcloud config get-value project)
+#    SA_EMAIL="vio-deployer@${PROJECT_ID}.iam.gserviceaccount.com"
+#
+#    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+#      --member="serviceAccount:${SA_EMAIL}" \
+#      --role="roles/run.admin"
+#
+#    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+#      --member="serviceAccount:${SA_EMAIL}" \
+#      --role="roles/artifactregistry.writer"
+#
+#    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+#      --member="serviceAccount:${SA_EMAIL}" \
+#      --role="roles/secretmanager.secretAccessor"
+#
+#    gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+#      --member="serviceAccount:${SA_EMAIL}" \
+#      --role="roles/iam.serviceAccountUser"
+#
+# 5. Workload Identity Pool / Provider 作成
+#    PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+#
+#    gcloud iam workload-identity-pools create "github-pool" \
+#      --location="global" \
+#      --display-name="GitHub Actions Pool"
+#
+#    gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+#      --location="global" \
+#      --workload-identity-pool="github-pool" \
+#      --display-name="GitHub Provider" \
+#      --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+#      --issuer-uri="https://token.actions.githubusercontent.com"
+#
+# 6. サービスアカウントと Workload Identity をバインド
+#    GITHUB_REPO="urushi-saku/voice-message-app"
+#
+#    gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
+#      --role="roles/iam.workloadIdentityUser" \
+#      --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-pool/attribute.repository/${GITHUB_REPO}"
+#
+# 7. GitHub Secrets に以下を登録
+#    GCP_PROJECT_ID                 — GCP プロジェクト ID
+#    GCP_REGION                     — リージョン（例: asia-northeast1）
+#    GCP_SERVICE_NAME               — Cloud Run サービス名（例: vio-backend）
+#    GCP_ARTIFACT_REGISTRY          — イメージパス（例: asia-northeast1-docker.pkg.dev/PROJECT/vio）
+#    GCP_WORKLOAD_IDENTITY_PROVIDER — projects/NUMBER/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+#    GCP_SERVICE_ACCOUNT_EMAIL      — vio-deployer@PROJECT_ID.iam.gserviceaccount.com
+#
+# 8. Cloud Run 用シークレット登録（Secret Manager）
+#    echo -n "YOUR_JWT_SECRET"   | gcloud secrets create vio-jwt-secret   --data-file=-
+#    echo -n "YOUR_MONGODB_URI"  | gcloud secrets create vio-mongodb-uri  --data-file=-
+#    echo -n "YOUR_REDIS_HOST"   | gcloud secrets create vio-redis-host   --data-file=-

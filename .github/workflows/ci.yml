@@ -1,0 +1,66 @@
+# ========================================
+# CI — バックエンドユニットテスト
+# ========================================
+# トリガー: main / develop への push、および pull_request
+# 目的: コードをマージする前にテストを自動実行して品質を保証する
+
+name: CI — Backend Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "backend/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  test:
+    name: Jest Unit Tests
+    runs-on: ubuntu-latest
+
+    # Node.jsのバージョンマトリクス（複数バージョンでテスト）
+    strategy:
+      matrix:
+        node-version: [20.x]
+
+    steps:
+      # 1. コードチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Node.js セットアップ（npm キャッシュを有効化）
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # 3. 依存パッケージインストール
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci --frozen-lockfile
+
+      # 4. テスト実行
+      - name: Run tests
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          # テスト用のダミー値（実際の DB には接続しない）
+          JWT_SECRET: test_jwt_secret_for_ci_only
+          MONGODB_URI: mongodb://localhost:27017/test_db
+        run: npm test
+
+      # 5. テストカバレッジをアーティファクトとして保存
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage/
+          retention-days: 7

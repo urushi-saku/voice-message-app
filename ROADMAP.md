@@ -26,6 +26,7 @@
 | ユーザー | アカウント削除機能 | ✅ 完了 |
 | Phase 7 | ウィジェットテスト実装 | ✅ 完了 |
 | Phase 7 | Docker コンテナ化 | ✅ 完了 |
+| Phase 7 | CI/CD パイプライン | ✅ 完了 |
 
 ---
 
@@ -250,7 +251,7 @@ voice-message-app/
 - [x] バックエンドユニットテスト（Jest / Supertest）
 - [x] Flutter ウィジェットテスト
 - [x] Docker コンテナ化
-- [ ] CI/CD パイプライン（GitHub Actions）
+- [x] CI/CD パイプライン（GitHub Actions）
 - [ ] 本番環境デプロイ（AWS / GCP）
 - [ ] App Store / Google Play リリース
 
@@ -276,10 +277,26 @@ voice-message-app/
 | E2EE | libsodium (sodium + sodium_libs FFI), flutter_secure_storage |
 | バージョン管理 | Git / GitHub |
 | コンテナ化 | Docker / Docker Compose |
+| CI/CD | GitHub Actions / GCP Cloud Run |
 
 ---
 
 ## 更新履歴
+
+### 2026-02-26
+- CI/CD パイプライン実装（GitHub Actions + GCP Cloud Run）
+  - `.github/workflows/ci.yml`: PR・push 時にバックエンドユニットテストを自動実行
+    - Node.js 20.x、`npm ci` キャッシュ、カバレッジレポートをアーティファクト保存
+  - `.github/workflows/deploy.yml`: main push 時に Cloud Run へ自動デプロイ
+    - 認証方式: **Workload Identity Federation (OIDC)** — Service Account Key 不要
+    - ステップ: テスト通過 → Docker マルチステージビルド → Artifact Registry push → Cloud Run デプロイ
+    - `concurrency` 設定で同ブランチの重複デプロイを自動キャンセル
+    - デプロイ結果（URL・イメージ・コミット SHA）を Job Summary に出力
+    - `workflow_dispatch` で手動トリガー・タグ指定デプロイも対応
+    - GCP セットアップ手順を deploy.yml 末尾にコメントで完全記載
+- Graceful Shutdown 実装（`app.js`）
+  - SIGTERM / SIGINT で `server.close()` → `mongoose.close()` → `redis.quit()` → `Sentry.close()` の順に安全終了
+  - 10秒タイムアウトでハングアップ防止
 
 ### 2026-02-26
 - Docker コンテナ化実装（「自分のPCでは動いたのに…」を撲滅）
@@ -425,3 +442,16 @@ usbipd attach --wsl --busid 1-1 --auto-attach
 # バックエンド + Flutter 同時起動
 cd /home/xiaox/voice-message-app && ./dev.sh
 ```
+実際に起動する手順
+# 1. 環境変数ファイルを準備
+cp backend/.env.docker.example backend/.env.docker
+# 必要に応じて JWT_SECRET などを編集
+
+# 2. 一発起動
+docker compose up -d
+
+# ログ確認
+docker compose logs -f backend
+
+# 停止
+docker compose down
