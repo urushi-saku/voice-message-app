@@ -237,12 +237,25 @@ const shutdown = async (signal, exitCode = 0) => {
       console.log('  ✅ Redis 切断完了');
     }
 
+    // 4. Sentry へのペンディング送信を待つ（エラーレポートの喪失防止）
+    if (process.env.SENTRY_DSN) {
+      console.log('  📤 Sentry への送信を待機中...');
+      await Sentry.close(5000); // 5秒以内に pending イベントを送信
+      console.log('  ✅ Sentry 送信完了');
+    }
+
     console.log('👋 シャットダウン完了');
     clearTimeout(forceExit);
     process.exit(exitCode);
   } catch (err) {
     console.error('❌ シャットダウン中にエラーが発生しました:', err);
     Sentry.captureException(err);
+    // Sentry 送信を待つ（エラーレポートの喪失防止）
+    if (process.env.SENTRY_DSN) {
+      await Sentry.close(3000).catch(() => {
+        // Sentry.close 自体がタイムアウトしても無視（既にログに出ているため）
+      });
+    }
     process.exit(1);
   }
 };
