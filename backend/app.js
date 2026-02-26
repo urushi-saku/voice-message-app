@@ -31,8 +31,9 @@ const path = require('path');                // ファイルパスを操作す�
 const fs = require('fs');                    // ファイル操作を行うためのモジュール
 const rateLimit = require('express-rate-limit'); // レート制限
 const helmet = require('helmet');                // セキュリティヘッダー (HSTS 等)
-const connectDB = require('./config/database'); // データベース接続
-require('./config/redis');                       // Redis クライアント起動（キャッシュ層）
+const mongoose   = require('mongoose');           // MongoDB 接続クローズ用
+const connectDB  = require('./config/database'); // データベース接続
+const redisClient = require('./config/redis');   // Redis クライアント起動（キャッシュ層）
 
 const app = express();                       // Expressアプリケーションを作成
 const PORT = process.env.PORT || 3000;       // サーバーが待機するポート番号
@@ -182,8 +183,9 @@ app.get('/health', (req, res) => {
 // ========================================
 // 指定したPORTでサーバーを起動
 // テスト時はサーバーを起動しない
+let server;
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
+  server = app.listen(PORT, () => {
     console.log('========================================');
     console.log(`🚀 サーバー起動: http://localhost:${PORT}`);
     console.log(`📝 環境: ${process.env.NODE_ENV || 'development'}`);
@@ -192,19 +194,78 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // ========================================
-// グローバルエラーハンドラー（サーバークラッシュ防止）
+// Graceful Shutdown
+// ========================================
+// dumb-init が SIGTERM をそのまま転送してくれるので、
+// ここで受け取り「新規リクエストの受付停止 → 接続クローズ」を行う。
+// これにより進行中のリクエストを中途切断せずに安全に終了できる。
+//
+// シャットダウン手順:
+//   1. server.close()   — 新規接続の受付を停止（既存リクエストは完走させる）
+//   2. mongoose.close() — MongoDB コネクションを閉じる
+//   3. redis.quit()     — Redis へ QUIT コマンドを送り接続を閉じる
+//   4. process.exit(0)  — 正常終了
+// ※ 10 秒以内に完了しない場合は強制終了（ハングアップ防止）
+const shutdown = async (signal, exitCode = 0) => {
+  console.log(`\n🛑 ${signal} を受信 — Graceful Shutdown を開始します...`);
+
+  // 強制終了タイマー（10 秒後に強制 exit）
+  const forceExit = setTimeout(() => {
+    console.error('⏰ シャットダウンがタイムアウト — 強制終了します');
+    process.exit(1);
+  }, 10_000);
+  forceExit.unref(); // タイマーだけが残ってもプロセスを維持しない
+
+  try {
+    // 1. HTTP サーバー: 新規リクエストの受付を停止
+    if (server) {
+      await new Promise((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
+      console.log('  ✅ HTTP サーバー停止完了');
+    }
+
+    // 2. MongoDB 接続クローズ
+    if (mongoose.connection.readyState !== 0) {
+      await mongoose.connection.close();
+      console.log('  ✅ MongoDB 切断完了');
+    }
+
+    // 3. Redis 接続クローズ（QUIT コマンドで通知してから切断）
+    if (redisClient.isAvailable) {
+      await redisClient.quit();
+      console.log('  ✅ Redis 切断完了');
+    }
+
+    console.log('👋 シャットダウン完了');
+    clearTimeout(forceExit);
+    process.exit(exitCode);
+  } catch (err) {
+    console.error('❌ シャットダウン中にエラーが発生しました:', err);
+    Sentry.captureException(err);
+    process.exit(1);
+  }
+};
+
+// docker stop / Kubernetes の terminationGracePeriodSeconds → SIGTERM
+process.on('SIGTERM', () => shutdown('SIGTERM', 0));
+// Ctrl+C（ローカル開発時）→ SIGINT
+process.on('SIGINT',  () => shutdown('SIGINT',  0));
+
+// ========================================
+// グローバルエラーハンドラー（予期しないクラッシュ）
 // ========================================
 process.on('uncaughtException', (err) => {
   console.error('【致命的エラー】uncaughtException:', err);
-  Sentry.captureException(err); // Sentry にエラーを送信
-  // プロセスを終了させない（サーバーを継続稼働）
+  Sentry.captureException(err);
+  // 致命的例外は Graceful Shutdown を試みてから終了
+  shutdown('uncaughtException', 1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('【警告】unhandledRejection:', reason, 'at:', promise);
-  // Promise rejection も Sentry に送信
   Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
-  // プロセスを終了させない（サーバーを継続稼働）
+  // unhandledRejection は警告に留め、プロセスは継続（クリティカルでない場合のみ）
 });
 
 // テスト用にエクスポート
