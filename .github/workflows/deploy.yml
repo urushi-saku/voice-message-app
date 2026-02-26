@@ -159,9 +159,6 @@ jobs:
             --cpu=1
             --timeout=60s
             --concurrency=80
-            # GCP Memorystore (Redis) を使う場合のみ以下を有効化
-            # --vpc-connector=${{ secrets.GCP_VPC_CONNECTOR }}
-            # --vpc-egress=all
 
       # 8. デプロイ結果をサマリーに出力
       - name: Show deployed URL
@@ -246,39 +243,42 @@ jobs:
 #    GCP_SERVICE_ACCOUNT_EMAIL      — vio-deployer@PROJECT_ID.iam.gserviceaccount.com
 #
 # 8. Cloud Run 用シークレット登録（Secret Manager）
-#    echo -n "YOUR_JWT_SECRET"   | gcloud secrets create vio-jwt-secret   --data-file=-
-#    echo -n "YOUR_MONGODB_URI"  | gcloud secrets create vio-mongodb-uri  --data-file=-
-#    echo -n "YOUR_REDIS_HOST"   | gcloud secrets create vio-redis-host   --data-file=-
+#    echo -n "YOUR_JWT_SECRET"       | gcloud secrets create vio-jwt-secret       --data-file=-
+#    echo -n "YOUR_MONGODB_URI"      | gcloud secrets create vio-mongodb-uri      --data-file=-
+#    echo -n "YOUR_UPSTASH_REDIS_URL" | gcloud secrets create vio-redis-host      --data-file=-
 #
-# ⚠️  Redis 接続時の設定（GCP Memorystore の場合）
-# ────────────────────────────────────────────
-# ❌ 【地味な落とし穴】
-#    GCP Memorystore の Redis はプライベート IP でしかアクセス不可。
-#    Cloud Run を同じ VPC に置かないと「接続に失敗する」が、
-#    その場はスルーして「本番環境に出したら謎のタイムアウト」になる。
+# 【推奨アーキテクチャ】外部マネージドサービス統一
+# ────────────────────────────────────────────────────────────────────
+# Cloud Run は「ステートレスなコンピュートリソース」に徹して、
+# 全ての外部依存を managed services に委譲する（VPC 不要化）
 #
-# ✅ 【回避策】
-#    以下の2つのうち1つを選ぶ:
+#   ✅ MongoDB Atlas
+#      - 公式 MongoDB クラウド
+#      - 接続: mongodb+srv://...
 #
-#    【方法 A】Serverless VPC Connector（推奨・価格安い）
-#      1. VPC Connector を作成:
-#         gcloud compute networks vpc-accessors create vio-vpc-conn \
-#           --network=default \
-#           --region=asia-northeast1 \
-#           --subnet=default
+#   ✅ Upstash Redis（推奨 ⭐）
+#      - Free Tier: 10GB データ + 100万リクエスト/日
+#      - インターネット経由アクセス（VPC Connector 不要）
+#      - 接続: redis://default:PASSWORD@HOSTNAME:PORT
+#      - 登録: https://upstash.com/docs/redis/getting-started/install
 #
-#      2. deploy.yml の flags に以下を追加:
-#         --vpc-connector=vio-vpc-conn
-#         --vpc-egress=all
+#   代替案: Redis Cloud
+#      - 無料プランあり
+#      - 接続: redis://default:PASSWORD@HOSTNAME:PORT
 #
-#      3. GitHub Secrets に登録:
-#         GCP_VPC_CONNECTOR=vio-vpc-conn
+#   ✅ Firebase Cloud Messaging
+#      - Google 純正（Cloud Run と同じプロジェクト内）
 #
-#      4. deploy.yml の flags を有効化（上記のコメント行を外す）
+#   ✅ Sentry
+#      - エラータグ機能（独立サービス）
 #
-#    【方法 B】Redis Cloud / Upstash（外部サービス）
-#      インターネット経由でアクセス可能 → VPC 設定不要
-#      ただし追加コスト発生
+# メリット:
+# - VPC Connector の複雑な設定が不要
+# - Cloud Run 本体はプリミティブ（ステートレス）
+# - スケーラビリティ が向上
+# - コスト: Free Tier で十分カバー可能
+# - ベンダーロック軽減（外部サービスなので移行容易）
+#
 #
 # 【Graceful Shutdown の時間設定】
 # ────────────────────────────────────────────

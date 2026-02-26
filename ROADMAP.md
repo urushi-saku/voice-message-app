@@ -294,7 +294,10 @@ voice-message-app/
     - デプロイ結果（URL・イメージ・コミット SHA）を Job Summary に出力
     - `workflow_dispatch` で手動トリガー・タグ指定デプロイも対応
     - GCP セットアップ手順を deploy.yml 末尾にコメントで完全記載
-    - **VPC Connector オプション** — GCP Memorystore (Redis) 使用時のオプション記載
+    - **推奨アーキテクチャ**: Upstash Redis + MongoDB Atlas + Firebase + Sentry（全て外部 managed services）
+      - VPC Connector 不要 → Cloud Run はステートレスコンピュート
+      - Upstash: Free Tier（10GB + 100万リクエスト/日）
+      - コスト削減 & スケーラビリティ向上
 - Graceful Shutdown アップグレード（`app.js`）
   - SIGTERM / SIGINT で `server.close()` → `mongoose.close()` → `redis.quit()` → `Sentry.close()` の順に安全終了
   - タイムアウト: **9500ms（9.5秒）**に短縮
