@@ -14,6 +14,7 @@
 // 5. AuthWrapper で認証状態確認
 // 6. ログイン状態に応じて画面表示
 
+import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -23,6 +24,7 @@ import 'providers/theme_provider.dart';
 import 'screens/home_page.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/forgot_password_screen.dart';
 import 'services/fcm_service.dart';
 import 'services/navigation_service.dart';
 import 'services/offline_service.dart';
@@ -125,6 +127,7 @@ class MyApp extends StatelessWidget {
             routes: {
               '/login': (context) => const LoginScreen(),
               '/register': (context) => const RegisterScreen(),
+              '/forgot-password': (context) => const ForgotPasswordScreen(),
               '/home': (context) => const HomePage(),
             },
           );
@@ -160,11 +163,14 @@ class _SplashScreenState extends State<SplashScreen> {
       print('❌ Offline Service error: $e');
     });
 
-    Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).then((_) => FcmService.initialize()).catchError((e) {
-      print('❌ Firebase error: $e');
-    });
+    // Firebase は Linux / Web デスクトップでは未サポートのためスキップ
+    if (!Platform.isLinux) {
+      Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).then((_) => FcmService.initialize()).catchError((e) {
+        print('❌ Firebase error: $e');
+      });
+    }
 
     // ThemeProvider・Network は軽量なので await
     if (mounted) {

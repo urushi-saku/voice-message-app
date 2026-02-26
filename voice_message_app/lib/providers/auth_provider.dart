@@ -336,6 +336,28 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ========================================
+  // パスワードリセットメール送信
+  // ========================================
+  /// 指定メールアドレスにパスワードリセットメールを送信します
+  /// 成功時は true、失敗時は false を返します
+  Future<bool> forgotPassword({required String email}) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await AuthService.forgotPassword(email);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ========================================
   // エラーメッセージをクリア
   // ========================================
   void clearError() {

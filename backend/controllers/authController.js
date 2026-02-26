@@ -70,16 +70,6 @@ exports.register = async (req, res) => {
       });
     }
 
-    // 重複するusernameをチェック
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({
-        success: false,
-        error: 'usernameは既に存在します',
-        message: 'usernameは既に存在します',
-      });
-    }
-
     // 重複するemailをチェック
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {

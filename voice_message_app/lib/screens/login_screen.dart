@@ -242,7 +242,32 @@ class _LoginScreenState extends State<LoginScreen> {
                             fillColor: Colors.grey[50],
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 8),
+
+                        // パスワードを忘れた方はこちら
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.of(
+                                context,
+                              ).pushNamed('/forgot-password');
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'パスワードを忘れた方はこちら',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.deepPurple[400],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
 
                         // ========================================
                         // ログインボタン

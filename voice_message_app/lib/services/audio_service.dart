@@ -9,7 +9,6 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/recording_config.dart';
-import '../models/audio_effects.dart';
 
 /// 音声の録音と再生を担当するサービスクラス
 class AudioService {
@@ -22,7 +21,6 @@ class AudioService {
   String? _recordingPath; // 録音中のファイルのパス
   bool _isRecording = false; // 録音中かどうか
   RecordingQuality _quality = RecordingQuality.medium; // デフォルト品質
-  AudioEffects _effects = AudioEffects.defaultEffects; // 音声エフェクト設定
 
   // ========================================
   // ゲッター（状態を外部から取得）
@@ -30,7 +28,6 @@ class AudioService {
   bool get isRecording => _isRecording;
   String? get recordingPath => _recordingPath;
   RecordingQuality get quality => _quality;
-  AudioEffects get effects => _effects;
 
   // ========================================
   // 録音品質を設定
@@ -41,39 +38,6 @@ class AudioService {
   ///   - quality: 設定する品質レベル
   void setQuality(RecordingQuality quality) {
     _quality = quality;
-  }
-
-  // ========================================
-  // 音声エフェクトを設定
-  // ========================================
-  /// 音声エフェクト全体を設定します
-  ///
-  /// パラメータ:
-  ///   - effects: 適用するエフェクト設定
-  Future<void> setEffects(AudioEffects effects) async {
-    _effects = effects;
-    await _applyEffectsToPlayer();
-  }
-
-  /// エフェクトをリセット（デフォルトに戻す）
-  Future<void> resetEffects() async {
-    _effects = AudioEffects.defaultEffects;
-    await _applyEffectsToPlayer();
-  }
-
-  /// 現在のプレイヤーにエフェクトを適用（内部メソッド）
-  Future<void> _applyEffectsToPlayer() async {
-    try {
-      // 音量を適用
-      await _player.setVolume(_effects.volume);
-
-      // 再生速度を適用（ピッチタイプによって速度を調整）
-      final speedWithPitch =
-          _effects.playbackSpeed * _effects.pitchType.pitchFactor;
-      await _player.setPlaybackRate(speedWithPitch.clamp(0.5, 2.0));
-    } catch (e) {
-      print('エフェクト適用エラー: $e');
-    }
   }
 
   // ========================================
@@ -155,7 +119,6 @@ class AudioService {
   Future<void> playLocal(String path) async {
     try {
       await _player.play(DeviceFileSource(path));
-      await _applyEffectsToPlayer();
     } catch (e) {
       print('ローカル再生エラー: $e');
     }
@@ -171,10 +134,49 @@ class AudioService {
   Future<void> playRemote(String url) async {
     try {
       await _player.play(UrlSource(url));
-      await _applyEffectsToPlayer();
     } catch (e) {
       print('リモート再生エラー: $e');
     }
+  }
+
+  // ========================================
+  // マイク振幅を取得（録音中に定期サンプリングする）
+  // ========================================
+  /// 現在のマイク振幅を 0.0～1.0 に正規化して返す
+  Future<double> getAmplitudeLevel() async {
+    try {
+      final amp = await _recorder.getAmplitude();
+      // dBFS：0 = 最大、約-60 = 無音
+      const minDb = -45.0;
+      final normalized = ((amp.current - minDb) / (0.0 - minDb)).clamp(
+        0.05,
+        1.0,
+      );
+      return normalized;
+    } catch (_) {
+      return 0.05;
+    }
+  }
+
+  // ========================================
+  // 再生状態ストリーム（RecordingProvider が購読）
+  // ========================================
+  /// 再生位置の変化（Duration）
+  Stream<Duration> get onPositionChanged => _player.onPositionChanged;
+
+  /// 全体尺度の確定
+  Stream<Duration> get onDurationChanged => _player.onDurationChanged;
+
+  /// 再生完了イベント
+  Stream<void> get onPlayerComplete => _player.onPlayerComplete;
+
+  // ========================================
+  // シーク（再生位置を移動）
+  // ========================================
+  Future<void> seekTo(Duration position) async {
+    try {
+      await _player.seek(position);
+    } catch (_) {}
   }
 
   // ========================================

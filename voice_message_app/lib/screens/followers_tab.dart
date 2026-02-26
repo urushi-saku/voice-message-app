@@ -16,7 +16,11 @@ class FollowersTab extends StatefulWidget {
   // 0: フォロワー, 1: フォロー中
   final int initialTabIndex;
 
-  const FollowersTab({super.key, this.initialTabIndex = 0});
+  /// 指定した場合、そのユーザーのフォロワー/フォロー一覧を表示
+  /// null の場合はログイン中ユーザーのリストを表示
+  final String? targetUserId;
+
+  const FollowersTab({super.key, this.initialTabIndex = 0, this.targetUserId});
 
   @override
   State<FollowersTab> createState() => _FollowersTabState();
@@ -48,7 +52,7 @@ class _FollowersTabState extends State<FollowersTab> {
 
     try {
       final authProvider = context.read<AuthProvider>();
-      final userId = authProvider.user?.id;
+      final userId = widget.targetUserId ?? authProvider.user?.id;
 
       if (userId == null) {
         throw Exception('ユーザー情報が取得できません');
@@ -374,7 +378,9 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                     itemBuilder: (context, index) {
                       final user = _searchResults[index];
                       // フォロー状態を判定
-                      final isFollowing = _following.any((u) => u.id == user.id);
+                      final isFollowing = _following.any(
+                        (u) => u.id == user.id,
+                      );
 
                       return ListTile(
                         onTap: () => Navigator.push(
@@ -409,7 +415,9 @@ class _UserSearchScreenState extends State<UserSearchScreen> {
                         trailing: ElevatedButton(
                           onPressed: () => _toggleFollow(user, isFollowing),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: isFollowing ? Colors.grey : Colors.deepPurple,
+                            backgroundColor: isFollowing
+                                ? Colors.grey
+                                : Colors.deepPurple,
                           ),
                           child: Text(
                             isFollowing ? 'フォロー中' : 'フォロー',

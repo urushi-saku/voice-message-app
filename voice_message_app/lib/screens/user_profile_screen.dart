@@ -1,10 +1,15 @@
 // ========================================
 // 他ユーザーのプロフィール画面
 // ========================================
+// 自分のプロフィール(profile_page.dart)と同じレイアウトで表示
+// フォローボタン・ボイスメッセージボタンを保持
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
+import 'followers_tab.dart';
 import 'recording_screen.dart';
 
 /// 他ユーザーのプロフィールを表示する画面
@@ -22,13 +27,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isLoading = true;
   bool _isProcessing = false;
 
+  // フォロワー/フォロー数をローカルで管理（フォロー操作後に即時反映）
+  late int _followersCount;
+  late int _followingCount;
+
   @override
   void initState() {
     super.initState();
+    _followersCount = widget.user.followersCount;
+    _followingCount = widget.user.followingCount;
     _checkFollowStatus();
   }
 
-  // 自分がこのユーザーをフォロー中か確認
+  // ========================================
+  // 画像パス → HTTP URL 変換
+  // ========================================
+  static String _imgUrl(String path) {
+    if (path.startsWith('http')) return path;
+    return '$kServerUrl/$path';
+  }
+
+  // ========================================
+  // フォロー状態を確認
+  // ========================================
   Future<void> _checkFollowStatus() async {
     try {
       final myId = context.read<AuthProvider>().user?.id;
@@ -46,13 +67,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  // フォロー/フォロー解除
+  // ========================================
+  // フォロー / フォロー解除
+  // ========================================
   Future<void> _toggleFollow() async {
     setState(() => _isProcessing = true);
     try {
       if (_isFollowing) {
         await UserService.unfollowUser(widget.user.id);
         if (mounted) {
+          setState(() {
+            _isFollowing = false;
+            _followersCount = (_followersCount - 1).clamp(0, 999999);
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${widget.user.username}のフォローを解除しました')),
           );
@@ -60,16 +87,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       } else {
         await UserService.followUser(widget.user.id);
         if (mounted) {
+          setState(() {
+            _isFollowing = true;
+            _followersCount += 1;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${widget.user.username}をフォローしました')),
           );
         }
       }
-      // プロフィールのフォロー数を即座に反映
-      if (mounted) {
-        await context.read<AuthProvider>().loadUserInfo();
-        setState(() => _isFollowing = !_isFollowing);
-      }
+      // 自分のフォロー数も更新
+      if (mounted) await context.read<AuthProvider>().loadUserInfo();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -81,184 +109,269 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  // ========================================
+  // ヘッダー未設定時のプレースホルダー
+  // ========================================
+  Widget _headerPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+        ),
+      ),
+    );
+  }
+
+  // ========================================
+  // ヘッダー上に重ねるアイコンボタン
+  // ========================================
+  Widget _overlayButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.black45,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Sliverを使ったリッチなスクロールUIに変更
+    final user = widget.user;
+
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // ========================================
-          // 伸縮するヘッダー (SliverAppBar)
-          // ========================================
-          SliverAppBar(
-            expandedHeight: 280.0,
-            floating: false,
-            pinned: true,
-            stretch: true,
-            backgroundColor: const Color(0xFF512DA8),
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [
-                StretchMode.zoomBackground,
-                StretchMode.blurBackground,
-              ],
-              background: Stack(
-                fit: StackFit.expand,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        top: true,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ========================================
+              // ヘッダー画像 ＋ アバター セクション
+              // ========================================
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  // 背景グラデーション
-                  Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [
-                          Color(0xFF7C4DFF),
-                          Color(0xFF512DA8),
-                          Color(0xFF311B92),
-                        ],
+                  Column(
+                    children: [
+                      // ヘッダー画像（200px）
+                      SizedBox(
+                        height: 200,
+                        width: double.infinity,
+                        child: user.headerImage != null
+                            ? Image.network(
+                                _imgUrl(user.headerImage!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _headerPlaceholder(),
+                              )
+                            : _headerPlaceholder(),
                       ),
+                      // アバター下半分 + 余白
+                      const SizedBox(height: 52),
+                    ],
+                  ),
+
+                  // 左上：戻るボタン
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: _overlayButton(
+                      icon: Icons.arrow_back,
+                      tooltip: '戻る',
+                      onTap: () => Navigator.pop(context),
                     ),
                   ),
-                  // 装飾的な円（デザインアクセント）
+
+                  // プロフィールアバター（ヘッダー下端に重なる）
                   Positioned(
-                    top: -50,
-                    right: -50,
+                    top: 160, // 200 - radius(40)
+                    left: 16,
                     child: Container(
-                      width: 200,
-                      height: 200,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.1),
+                        border: Border.all(color: Colors.white, width: 4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                    ),
-                  ),
-                  // プロフィール画像（大きく表示）
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 40), // AppBar分の余白
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: 60,
-                            backgroundColor: Colors.white,
-                            backgroundImage: widget.user.profileImage != null
-                                ? NetworkImage(widget.user.profileImage!)
-                                : null,
-                            child: widget.user.profileImage == null
-                                ? Text(
-                                    widget.user.username[0].toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 50,
-                                      color: Color(0xFF512DA8),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.user.username,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black26,
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          '@${widget.user.handle}',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: const Color(0xFF7C4DFF),
+                        backgroundImage: user.profileImage != null
+                            ? NetworkImage(_imgUrl(user.profileImage!))
+                            : null,
+                        child: user.profileImage == null
+                            ? Text(
+                                user.username.isNotEmpty
+                                    ? user.username[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            : null,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
 
-          // ========================================
-          // コンテンツ部分
-          // ========================================
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              transform: Matrix4.translationValues(0, -20, 0), // 少し上に重ねる
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
+              // ========================================
+              // プロフィール情報
+              // ========================================
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ハンドルバー（装飾）
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 24),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                    // ユーザー名
+                    Text(
+                      user.username,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
+                    ),
+                    const SizedBox(height: 2),
+
+                    // ハンドル
+                    Text(
+                      '@${user.handle}',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
 
                     // 自己紹介
-                    if (widget.user.bio.isNotEmpty) ...[
-                      const Text(
-                        "About",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
+                    if (user.bio.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Text(
-                        widget.user.bio,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: Colors.black54,
+                        user.bio,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[800],
+                          height: 1.4,
                         ),
                       ),
-                      const SizedBox(height: 32),
                     ],
 
-                    // アクションボタンエリア
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+
+                    // フォロー情報（タップでフォロワー一覧へ）
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FollowersTab(
+                                initialTabIndex: 0,
+                                targetUserId: user.id,
+                              ),
+                            ),
+                          ),
+                          child: RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$_followersCount',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' フォロワー',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FollowersTab(
+                                initialTabIndex: 1,
+                                targetUserId: user.id,
+                              ),
+                            ),
+                          ),
+                          child: RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '$_followingCount',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' フォロー中',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+                    const Divider(height: 1),
+                    const SizedBox(height: 20),
+
+                    // ========================================
+                    // アクションボタン（フォロー ＋ ボイスメッセージ）
+                    // ========================================
                     Row(
                       children: [
                         // フォローボタン
                         Expanded(
                           child: _isLoading
-                              ? const Center(child: CircularProgressIndicator())
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                )
                               : ElevatedButton(
                                   onPressed: _isProcessing
                                       ? null
@@ -271,8 +384,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         ? Colors.black87
                                         : Colors.white,
                                     elevation: _isFollowing ? 0 : 4,
+                                    shadowColor: const Color(
+                                      0xFF7C4DFF,
+                                    ).withValues(alpha: 0.4),
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
+                                      vertical: 14,
                                     ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
@@ -290,32 +406,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                           _isFollowing ? 'フォロー中' : 'フォローする',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 16,
+                                            fontSize: 15,
                                           ),
                                         ),
                                 ),
                         ),
                         const SizedBox(width: 12),
-                        // メッセージボタン
+
+                        // ボイスメッセージボタン（マイクアイコン）
                         InkWell(
                           onTap: () => Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => RecordingScreen(
-                                recipientIds: [widget.user.id],
-                                recipientUsername: widget.user.username,
-                                recipientProfileImage: widget.user.profileImage,
+                                recipientIds: [user.id],
+                                recipientUsername: user.username,
+                                recipientProfileImage: user.profileImage,
                               ),
                             ),
                           ),
                           borderRadius: BorderRadius.circular(16),
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEDE7F6),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: const Color(0xFF7C4DFF).withOpacity(0.3),
+                                color: const Color(
+                                  0xFF7C4DFF,
+                                ).withValues(alpha: 0.3),
                               ),
                             ),
                             child: const Icon(
@@ -330,9 +449,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

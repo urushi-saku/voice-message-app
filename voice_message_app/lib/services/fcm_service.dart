@@ -3,6 +3,7 @@
 // ========================================
 // プッシュ通知の受信・管理を行うサービス
 
+import 'dart:io' show Platform;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -45,6 +46,8 @@ class FcmService {
   /// ④サーバーにトークンを送信
   /// ⑤通知リスナーを設定
   static Future<void> initialize() async {
+    // Linux / デスクトップでは Firebase 未サポートのためスキップ
+    if (Platform.isLinux) return;
     try {
       // ① flutter_local_notifications 初期化
       const AndroidInitializationSettings androidSettings =
@@ -157,6 +160,7 @@ class FcmService {
   /// ========================================
   /// ログイン・登録・アプリ起動時（既ログイン）に呼び出す
   static Future<void> sendTokenAfterLogin() async {
+    if (Platform.isLinux) return;
     try {
       final token = await _firebaseMessaging.getToken();
       if (token == null) {
@@ -274,6 +278,7 @@ class FcmService {
   /// FCMトークンを削除（ログアウト時）
   /// ========================================
   static Future<void> deleteToken() async {
+    if (Platform.isLinux) return;
     try {
       await _firebaseMessaging.deleteToken();
       print('✅ FCMトークンを削除しました');

@@ -10,9 +10,11 @@
 // - RecordingProvider : 録音・再生・送信のビジネスロジック・状態管理
 
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/recording_provider.dart';
 import '../models/recording_config.dart';
 
@@ -40,11 +42,9 @@ class _RecordingScreenState extends State<RecordingScreen>
   late final RecordingProvider _provider;
 
   // ========================================
-  // UI 専用: アニメーション（TickerProvider が必要なため Screen に残す）
+  // UI 専用: アニメーション
   // ========================================
   late AnimationController _pulseController; // 同心円パルス（録音中）
-  late AnimationController _waveController;  // 波形バーアニメーション（再生中）
-  late List<Animation<double>> _waveAnimations;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -65,24 +65,6 @@ class _RecordingScreenState extends State<RecordingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat();
-
-    // 波形バーアニメーション（再生中に repeat）
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-
-    const barCount = 12;
-    _waveAnimations = List.generate(barCount, (i) {
-      final start = (i / barCount);
-      final end = ((i + 0.6) / barCount).clamp(0.0, 1.0);
-      return Tween<double>(begin: 0.2, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _waveController,
-          curve: Interval(start, end, curve: Curves.easeInOut),
-        ),
-      );
-    });
   }
 
   void _onProviderChanged() {
@@ -100,8 +82,24 @@ class _RecordingScreenState extends State<RecordingScreen>
     _provider.removeListener(_onProviderChanged);
     _provider.dispose();
     _pulseController.dispose();
-    _waveController.dispose();
     super.dispose();
+  }
+
+  // ========================================
+  // 音声ファイル選択（UI操作のため Screen に残す）
+  // ========================================
+  Future<void> _pickAudioFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac', 'opus'],
+      );
+      if (result != null && result.files.single.path != null) {
+        _provider.setFromFile(result.files.single.path!);
+      }
+    } catch (e) {
+      _showError('ファイル選択エラー: $e');
+    }
   }
 
   // ========================================
@@ -141,11 +139,7 @@ class _RecordingScreenState extends State<RecordingScreen>
               children: [
                 Icon(Icons.cloud_off, color: Colors.white, size: 18),
                 SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'サーバーに接続できませんでした。\nネットワーク復帰後に自動送信されます。',
-                  ),
-                ),
+                Expanded(child: Text('サーバーに接続できませんでした。\nネットワーク復帰後に自動送信されます。')),
               ],
             ),
             backgroundColor: Colors.orange.shade700,
@@ -162,10 +156,7 @@ class _RecordingScreenState extends State<RecordingScreen>
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg),
-        backgroundColor: Colors.red.shade700,
-      ),
+      SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700),
     );
   }
 
@@ -266,9 +257,11 @@ class _RecordingScreenState extends State<RecordingScreen>
                 _provider.isRecording
                     ? '録音中'
                     : _provider.hasRecording
-                    ? '録音完了'
+                    ? (_provider.isFromFile ? 'ファイル選択済み' : '録音完了')
                     : '録音を開始',
-                key: ValueKey('${_provider.isRecording}${_provider.hasRecording}'),
+                key: ValueKey(
+                  '${_provider.isRecording}${_provider.hasRecording}',
+                ),
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -288,12 +281,64 @@ class _RecordingScreenState extends State<RecordingScreen>
               _buildMicButton()
             else
               _buildWaveformDisplay(),
-
+            // 録音中はリアルタイム波形を下に表示
+            if (_provider.isRecording && _provider.waveformData.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: 280,
+                height: 48,
+                child: CustomPaint(
+                  painter: _WaveformPainter(
+                    samples: _provider.waveformData,
+                    progress: 0.0,
+                  ),
+                ),
+              ),
+            ],
+            // ファイル選択ボタン（録音前のみ表示）
+            if (!_provider.hasRecording && !_provider.isRecording) ...[
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: _pickAudioFile,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.upload_file_rounded,
+                        size: 18,
+                        color: Colors.white.withOpacity(0.85),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'ファイルを選択',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.85),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 28),
 
             // タイマー
             AnimatedOpacity(
-              opacity: (_provider.isRecording || _provider.hasRecording) ? 1.0 : 0.0,
+              opacity: (_provider.isRecording || _provider.hasRecording)
+                  ? 1.0
+                  : 0.0,
               duration: const Duration(milliseconds: 300),
               child: Text(
                 _provider.timerText,
@@ -425,9 +470,7 @@ class _RecordingScreenState extends State<RecordingScreen>
                     alignment: Alignment.center,
                     children: [
                       for (int i = 0; i < 3; i++)
-                        _buildPulseRing(
-                          (_pulseController.value + i / 3) % 1.0,
-                        ),
+                        _buildPulseRing((_pulseController.value + i / 3) % 1.0),
                     ],
                   );
                 },
@@ -448,19 +491,18 @@ class _RecordingScreenState extends State<RecordingScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (_provider.isRecording
-                            ? const Color(0xFFFF5252)
-                            : const Color(0xFF7C4DFF))
-                        .withOpacity(0.55),
+                    color:
+                        (_provider.isRecording
+                                ? const Color(0xFFFF5252)
+                                : const Color(0xFF7C4DFF))
+                            .withOpacity(0.55),
                     blurRadius: 32,
                     spreadRadius: 4,
                   ),
                 ],
               ),
               child: Icon(
-                _provider.isRecording
-                    ? Icons.stop_rounded
-                    : Icons.mic_rounded,
+                _provider.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
                 color: Colors.white,
                 size: 40,
               ),
@@ -488,54 +530,26 @@ class _RecordingScreenState extends State<RecordingScreen>
   }
 
   // ========================================
-  // 録音完了後の波形ビジュアル
+  // 録音完了後の波形ビジュアル（実波形 + 再生進捗）
   // ========================================
   Widget _buildWaveformDisplay() {
-    const barCount = 28;
-    const barHeights = [
-      18.0, 28.0, 22.0, 38.0, 30.0, 50.0, 42.0, 60.0, 48.0, 55.0,
-      38.0, 62.0, 44.0, 58.0, 36.0, 50.0, 40.0, 56.0, 32.0, 46.0,
-      38.0, 28.0, 42.0, 30.0, 22.0, 34.0, 20.0, 16.0,
-    ];
-
-    return Container(
-      width: 260,
-      height: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: List.generate(barCount, (i) {
-          final h = barHeights[i % barHeights.length];
-          return AnimatedBuilder(
-            animation: _waveController,
-            builder: (_, __) {
-              final scale = _provider.isPlaying
-                  ? _waveAnimations[i % _waveAnimations.length].value
-                  : 1.0;
-              return Container(
-                width: 4,
-                height: h * scale,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      const Color(0xFF9C6FFF).withOpacity(0.5),
-                      const Color(0xFFCE93D8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            },
-          );
-        }),
+    const w = 280.0;
+    const h = 80.0;
+    return GestureDetector(
+      // タップ / ドラッグでシーク
+      onTapDown: (d) =>
+          _provider.seekTo((d.localPosition.dx / w).clamp(0.0, 1.0)),
+      onHorizontalDragUpdate: (d) =>
+          _provider.seekTo((d.localPosition.dx / w).clamp(0.0, 1.0)),
+      child: SizedBox(
+        width: w,
+        height: h,
+        child: CustomPaint(
+          painter: _WaveformPainter(
+            samples: _provider.waveformData,
+            progress: _provider.playProgress,
+          ),
+        ),
       ),
     );
   }
@@ -589,11 +603,7 @@ class _RecordingScreenState extends State<RecordingScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.graphic_eq,
-                size: 16,
-                color: Color(0xFF7C4DFF),
-              ),
+              const Icon(Icons.graphic_eq, size: 16, color: Color(0xFF7C4DFF)),
               const SizedBox(width: 6),
               Text(
                 '録音品質: ${config.displayName}',
@@ -618,6 +628,28 @@ class _RecordingScreenState extends State<RecordingScreen>
       key: const ValueKey('post'),
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ファイルアップロード時のファイル名表示
+        if (_provider.isFromFile) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.audio_file_rounded,
+                size: 16,
+                color: Colors.deepPurple[300],
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  _provider.recordedPath?.split('/').last ?? 'audio file',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         // 再生ボタン
         GestureDetector(
           onTap: _provider.togglePlay,
@@ -663,7 +695,7 @@ class _RecordingScreenState extends State<RecordingScreen>
               child: OutlinedButton.icon(
                 onPressed: _provider.isSending ? null : _provider.retake,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('撮り直す'),
+                label: Text(_provider.isFromFile ? '選び直す' : '撮り直す'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.grey[700],
                   side: BorderSide(color: Colors.grey[300]!),
@@ -707,4 +739,75 @@ class _RecordingScreenState extends State<RecordingScreen>
       ],
     );
   }
+}
+
+// ============================================================
+// 波形 CustomPainter
+// ============================================================
+/// 録音時にサンプリングした振幅データを棒グラフ形式で描画する。
+/// [progress] 0.0〜1.0 で再生済み部分を紫、未再生をグレーで塗り分ける。
+class _WaveformPainter extends CustomPainter {
+  final List<double> samples;
+  final double progress;
+
+  static const _barCount = 44;
+  static const _barWidth = 3.0;
+  static const _minHeight = 3.0;
+
+  const _WaveformPainter({required this.samples, required this.progress});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final resampled = _resample(samples, _barCount);
+    final gap = (size.width - _barCount * _barWidth) / (_barCount + 1);
+    final cy = size.height / 2;
+
+    final playedPaint = Paint()
+      ..color = const Color.fromARGB(255, 145, 95, 254)
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = _barWidth;
+
+    final unplayedPaint = Paint()
+      ..color = Colors.white.withOpacity(0.38)
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = _barWidth;
+
+    for (int i = 0; i < _barCount; i++) {
+      final x = gap * (i + 1) + _barWidth * i + _barWidth / 2;
+      final h = (_minHeight + resampled[i] * (size.height - _minHeight)).clamp(
+        _minHeight,
+        size.height,
+      );
+      final played = i / _barCount < progress;
+      final paint = played ? playedPaint : unplayedPaint;
+      canvas.drawLine(Offset(x, cy - h / 2), Offset(x, cy + h / 2), paint);
+    }
+  }
+
+  /// [data] を [count] 本にリサンプリング（ブロック平均）
+  List<double> _resample(List<double> data, int count) {
+    if (data.isEmpty) {
+      // データなし → 両端が低く中央が高い山型を返す
+      return List.generate(count, (i) {
+        final env = math.sin(i / (count - 1) * math.pi);
+        return 0.08 + env * 0.35;
+      });
+    }
+    if (data.length <= count) {
+      // データが少ない場合はそのまま（右埋め）
+      return [...data, ...List.filled(count - data.length, data.last)];
+    }
+    // ブロック平均でダウンサンプリング
+    final blockSize = data.length / count;
+    return List.generate(count, (i) {
+      final start = (i * blockSize).floor();
+      final end = ((i + 1) * blockSize).ceil().clamp(start + 1, data.length);
+      final slice = data.sublist(start, end);
+      return slice.reduce((a, b) => a + b) / slice.length;
+    });
+  }
+
+  @override
+  bool shouldRepaint(_WaveformPainter old) =>
+      old.progress != progress || old.samples.length != samples.length;
 }

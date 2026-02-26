@@ -30,6 +30,7 @@
 //   ・純 Dart → ネイティブ C 実装 (FFI) による大幅な高速化
 
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'package:sodium/sodium.dart' hide SodiumInit;
 import 'package:sodium_libs/sodium_libs.dart' show SodiumInit;
@@ -93,6 +94,22 @@ class E2eeService {
   static const _skStorageKey = 'e2ee_secret_key_v2'; // v2: sodium 移行後の鍵
   static const _pkStorageKey = 'e2ee_public_key_v2';
 
+  // Linux では libsecret/keyring が使えないためメモリ内ストレージを使用
+  static final Map<String, String> _memStorage = {};
+
+  static Future<String?> _secureRead(String key) async {
+    if (Platform.isLinux) return _memStorage[key];
+    return await _storage.read(key: key);
+  }
+
+  static Future<void> _secureWrite(String key, String value) async {
+    if (Platform.isLinux) {
+      _memStorage[key] = value;
+      return;
+    }
+    await _storage.write(key: key, value: value);
+  }
+
   // libsodium インスタンス（遅延初期化シングルトン）
   static Sodium? _sodium;
 
@@ -108,8 +125,8 @@ class E2eeService {
   /// 既存のキーペアを読み込む or 新規生成してデバイスの SecureStorage に保存する
   /// 戻り値: (publicKeyBytes 32B, privateKeyBytes 32B)
   static Future<(Uint8List, Uint8List)> getOrCreateKeyPair() async {
-    final storedSk = await _storage.read(key: _skStorageKey);
-    final storedPk = await _storage.read(key: _pkStorageKey);
+    final storedSk = await _secureRead(_skStorageKey);
+    final storedPk = await _secureRead(_pkStorageKey);
 
     if (storedSk != null && storedPk != null) {
       return (base64Decode(storedPk), base64Decode(storedSk));
@@ -123,8 +140,8 @@ class E2eeService {
     final skBytes = Uint8List.fromList(keyPair.secretKey.extractBytes());
     keyPair.secretKey.dispose(); // 秘密鍵はメモリから消去
 
-    await _storage.write(key: _pkStorageKey, value: base64Encode(pkBytes));
-    await _storage.write(key: _skStorageKey, value: base64Encode(skBytes));
+    await _secureWrite(_pkStorageKey, base64Encode(pkBytes));
+    await _secureWrite(_skStorageKey, base64Encode(skBytes));
 
     return (pkBytes, skBytes);
   }

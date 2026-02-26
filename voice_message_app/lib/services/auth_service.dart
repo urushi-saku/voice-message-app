@@ -88,21 +88,20 @@ class AuthService {
         // ③ トークンをローカルストレージに保存
         // 将来的なAPI呼び出しで認証ヘッダーとして使用
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('authToken', data['data']['token']);
+        await prefs.setString('authToken', data['token']);
         // リフレッシュトークンも保存
-        if (data['data']['refreshToken'] != null) {
-          await prefs.setString('refreshToken', data['data']['refreshToken']);
+        if (data['refreshToken'] != null) {
+          await prefs.setString('refreshToken', data['refreshToken']);
         }
         // ユーザー ID をローカル保存（E2EE 郵号化で使用）
-        final userId =
-            data['data']['user']?['_id'] ?? data['data']['user']?['id'];
+        final userId = data['user']?['_id'] ?? data['user']?['id'];
         if (userId != null) await storeCurrentUserId(userId.toString());
 
         // ④ E2EE キーペア生成 & 公開鍵をサーバーにアップロード
         await E2eeService.uploadPublicKey();
 
         // ⑤ ユーザー情報を返す
-        return data['data'];
+        return data;
       } else {
         // ② エラーレスポンスの場合
         final error = jsonDecode(response.body);
@@ -158,21 +157,20 @@ class AuthService {
 
         // ③ トークンをローカルストレージに保存
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('authToken', data['data']['token']);
+        await prefs.setString('authToken', data['token']);
         // リフレッシュトークンも保存
-        if (data['data']['refreshToken'] != null) {
-          await prefs.setString('refreshToken', data['data']['refreshToken']);
+        if (data['refreshToken'] != null) {
+          await prefs.setString('refreshToken', data['refreshToken']);
         }
         // ユーザー ID をローカル保存（E2EE 郵号化で使用）
-        final userId =
-            data['data']['user']?['_id'] ?? data['data']['user']?['id'];
+        final userId = data['user']?['_id'] ?? data['user']?['id'];
         if (userId != null) await storeCurrentUserId(userId.toString());
 
         // ④ E2EE キーペア生成 & 公開鍵をサーバーにアップロード
         await E2eeService.uploadPublicKey();
 
         // ⑤ ユーザー情報を返す
-        return data['data'];
+        return data;
       } else {
         // ② エラーレスポンスの場合
         final error = jsonDecode(response.body);
