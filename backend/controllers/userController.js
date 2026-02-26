@@ -7,8 +7,10 @@
 const User = require('../models/User');
 const Follower = require('../models/Follower');
 const Message = require('../models/Message');
+const Notification = require('../models/Notification');
 const fs = require('fs').promises;
 const cache = require('../utils/cache');
+const { sendPushNotification } = require('../config/firebase');
 
 // ========================================
 // ユーザー一覧取得
@@ -218,6 +220,32 @@ exports.followUser = async (req, res) => {
     await User.findByIdAndUpdate(currentUserId, {
       $inc: { followingCount: 1 } // フォローした人のフォロー中数+1
     });
+
+    // フォロー通知を作成
+    const currentUser = await User.findById(currentUserId);
+    await Notification.create({
+      recipient: targetUserId,
+      sender: currentUserId,
+      type: 'follow',
+      content: `${currentUser.username}があなたをフォローしました`,
+      relatedId: currentUserId,
+    });
+
+    // プッシュ通知を送信（バックグラウンドで実行、エラーは無視）
+    if (targetUser.fcmToken) {
+      sendPushNotification(
+        targetUser.fcmToken,
+        {
+          title: 'フォローされました',
+          body: `${currentUser.username}があなたをフォローしました`,
+        },
+        {
+          type: 'follow',
+          senderId: currentUserId,
+          senderUsername: currentUser.username,
+        }
+      ).catch(err => console.error('プッシュ通知送信エラー:', err));
+    }
 
     // フォロー後にキャッシュを無効化
     await cache.del(

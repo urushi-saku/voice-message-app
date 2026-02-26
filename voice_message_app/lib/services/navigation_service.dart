@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import '../screens/home_page.dart';
 import '../screens/thread_detail_screen.dart';
+import '../screens/user_profile_screen.dart';
 import 'user_service.dart';
 
 class NavigationService {
@@ -30,7 +31,8 @@ class NavigationService {
   ///
   /// 優先順位：
   /// 1. type == 'new_message' かつ senderId あり → ThreadDetailScreen へ
-  /// 2. それ以外 → ホーム（メッセージタブ）へ
+  /// 2. type == 'follow' かつ senderId あり → UserProfileScreen へ
+  /// 3. それ以外 → ホーム（メッセージタブ）へ
   static void navigateFromNotification(Map<String, dynamic> data) {
     final nav = navigator;
     if (nav == null) {
@@ -79,8 +81,30 @@ class NavigationService {
           ),
         );
       });
+    } else if (type == 'follow' && senderId != null && senderId.isNotEmpty) {
+      // フォロー通知の場合はそのユーザーのプロフィール画面へ遷移
+      nav.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (route) => false,
+      );
+
+      Future(() async {
+        final userFuture = UserService.getUserById(
+          senderId,
+        ).then<UserInfo?>((u) => u).catchError((_) => null as UserInfo?);
+        await Future.delayed(const Duration(milliseconds: 300));
+        final user = await userFuture;
+
+        if (user != null) {
+          navigator?.push(
+            MaterialPageRoute(
+              builder: (_) => UserProfileScreen(user: user),
+            ),
+          );
+        }
+      });
     } else {
-      // メッセージ一覧（ホーム）へ遷移
+      // その他の通知またはデータが不完全な場合はホームへ
       nav.pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomePage()),
         (route) => false,
