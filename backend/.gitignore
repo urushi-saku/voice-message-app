@@ -1,5 +1,6 @@
 # 環境変数
 .env
+.env.docker
 
 # Firebase秘密鍵（機密情報）
 config/serviceAccountKey.json

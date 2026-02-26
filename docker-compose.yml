@@ -1,0 +1,101 @@
+# ========================================
+# Vio — docker-compose.yml
+# ========================================
+# docker compose up -d  一発で環境が立ち上がります
+#
+# 含まれるサービス:
+#   backend  — Node.js / Express API サーバー (Port 3000)
+#   mongo    — MongoDB 7 データベース (Port 27017)
+#   redis    — Redis 7 キャッシュ層  (Port 6379)
+# ========================================
+
+services:
+  # ── MongoDB ──────────────────────────────────────────────
+  mongo:
+    image: mongo:7-jammy
+    container_name: vio-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-vio}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-viopassword}
+      MONGO_INITDB_DATABASE: voice_message_app
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - vio-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Redis ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: vio-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - vio-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ── Backend (Node.js / Express) ──────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vio-backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env.docker
+    environment:
+      # コンテナ内サービスの接続先を上書き
+      # .env.docker に MONGODB_URI が設定されていない場合のデフォルト
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-vio}:${MONGO_ROOT_PASSWORD:-viopassword}@mongo:27017/voice_message_app?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3000:3000"
+    volumes:
+      # アップロードファイルをホスト側にも永続化
+      - ./backend/uploads:/app/uploads
+      # Firebase サービスアカウントキーをコンテナイメージに含めずマウント
+      - ./backend/config/serviceAccountKey.json:/app/config/serviceAccountKey.json:ro
+    networks:
+      - vio-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+# ── ボリューム ────────────────────────────────────────────────
+volumes:
+  mongo_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ── ネットワーク ──────────────────────────────────────────────
+networks:
+  vio-net:
+    driver: bridge

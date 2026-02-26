@@ -25,6 +25,7 @@
 | ダウンロード | ボイスメッセージダウンロード | ✅ 完了 |
 | ユーザー | アカウント削除機能 | ✅ 完了 |
 | Phase 7 | ウィジェットテスト実装 | ✅ 完了 |
+| Phase 7 | Docker コンテナ化 | ✅ 完了 |
 
 ---
 
@@ -247,8 +248,8 @@ voice-message-app/
 ### Phase 7 — テスト・デプロイメント
 
 - [x] バックエンドユニットテスト（Jest / Supertest）
-- [ ] Flutter ウィジェットテスト
-- [ ] Docker コンテナ化
+- [x] Flutter ウィジェットテスト
+- [x] Docker コンテナ化
 - [ ] CI/CD パイプライン（GitHub Actions）
 - [ ] 本番環境デプロイ（AWS / GCP）
 - [ ] App Store / Google Play リリース
@@ -274,10 +275,29 @@ voice-message-app/
 | 通知 | Firebase Cloud Messaging |
 | E2EE | libsodium (sodium + sodium_libs FFI), flutter_secure_storage |
 | バージョン管理 | Git / GitHub |
+| コンテナ化 | Docker / Docker Compose |
 
 ---
 
 ## 更新履歴
+
+### 2026-02-26
+- Docker コンテナ化実装（「自分のPCでは動いたのに…」を撲滅）
+  - `backend/Dockerfile`: 3ステージ マルチステージビルド（deps / prod-deps / runner）
+    - ベースイメージ: `node:20-alpine`（軽量・セキュリティパッチ済み）
+    - `dumb-init` で PID 1 問題・シグナル伝播を適切に処理
+    - 非 root ユーザー `viouser` で実行（セキュリティ強化）
+    - 開発依存（devDependencies）を本番イメージから除外
+  - `docker-compose.yml`: `docker compose up -d` 一発で全環境が立ち上がる
+    - `backend` — Node.js/Express API サーバー (Port 3000)
+    - `mongo` — MongoDB 7 (Port 27017、ヘルスチェック付き)
+    - `redis` — Redis 7-alpine (Port 6379、ヘルスチェック付き)
+    - `depends_on` で起動順序を保証（mongo・redis が healthy になってから backend 起動）
+    - `uploads/` ・ `serviceAccountKey.json` はボリュームマウントでコンテナ外管理
+  - `backend/.dockerignore`: ビルドコンテキスト最小化（node_modules・.env・テストファイル除外）
+  - `backend/.env.docker.example`: Docker 専用環境変数テンプレート
+  - `.gitignore` に `.env.docker` を追加（秘密情報の誤コミット防止）
+- Flutter ウィジェットテスト完了（6/6 PASS）記録をROADMAPに反映
 
 ### 2026-02-23
 - Redis APIレスポンスキャッシング実装

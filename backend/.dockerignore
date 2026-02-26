@@ -1,0 +1,41 @@
+# ========================================
+# .dockerignore — Docker ビルドコンテキストから除外するファイル
+# ========================================
+
+# 依存パッケージ（イメージ内で npm ci するため不要）
+node_modules/
+
+# ログ・一時ファイル
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# テスト・開発用
+__tests__/
+coverage/
+.nyc_output/
+jest.config.js
+TEST_REPORT.md
+
+# 環境変数（ホスト環境の .env をイメージに含めない）
+.env
+.env.test
+.env.local
+.env.*.local
+
+# Git・エディタ設定
+.git/
+.gitignore
+.DS_Store
+Thumbs.db
+
+# ドキュメント
+*.md
+doc/
+
+# アップロードファイル（本番はボリュームマウント）
+uploads/
+
+# Firebase キー（同上: ボリュームマウント）
+config/serviceAccountKey.json

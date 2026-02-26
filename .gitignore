@@ -1,6 +1,7 @@
 # Node.js
 node_modules/
 .env
+.env.docker
 
 # Firebase
 backend/config/serviceAccountKey.json
