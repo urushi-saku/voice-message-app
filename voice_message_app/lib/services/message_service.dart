@@ -500,7 +500,16 @@ class MessageService {
     );
 
     if (response.statusCode == 200) {
-      return jsonDecode(response.body);
+      final data = jsonDecode(response.body);
+
+      // バックエンドが配列を直接返すか、オブジェクト内に配列を返すか対応
+      if (data is List) {
+        return data;
+      } else if (data is Map && data.containsKey('messages')) {
+        return data['messages'] as List<dynamic>;
+      } else {
+        throw Exception('予期しないレスポンス形式です');
+      }
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? '送信メッセージの取得に失敗しました');

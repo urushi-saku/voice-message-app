@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/recording_config.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import 'legal_screen.dart';
 
 /// アプリケーション設定画面
 class SettingsScreen extends StatefulWidget {
@@ -252,8 +253,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ========================================
-          // 説明セクション
+          // 法務情報セクション
           // ========================================
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              '法務情報',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+
+          // 利用規約
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              leading: Icon(
+                Icons.description,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text('利用規約'),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const TermsOfServiceScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // プライバシーポリシー
+          Card(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: ListTile(
+              leading: Icon(
+                Icons.privacy_tip,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text('プライバシーポリシー'),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PrivacyPolicyScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 24),
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),

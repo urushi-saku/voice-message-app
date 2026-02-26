@@ -41,14 +41,12 @@ const storage = multer.diskStorage({
 
 // ファイルフィルター（画像ファイルのみ許可）
 const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = [
-    'image/jpeg',       // jpg, jpeg
-    'image/png',        // png
-    'image/gif',        // gif
-    'image/webp'        // webp
-  ];
+  // image/* すべて許可（image/jpg, image/jpeg, image/png, image/webp 等）
+  // または mimetype が不明な場合も拡張子で判断
+  const isImage = file.mimetype.startsWith('image/') ||
+    file.mimetype === 'application/octet-stream';
 
-  if (allowedMimeTypes.includes(file.mimetype)) {
+  if (isImage) {
     cb(null, true);
   } else {
     cb(new Error('画像ファイルのみアップロード可能です'), false);
@@ -83,7 +81,15 @@ router.put('/profile', protect, updateProfile);
 
 // プロフィール画像更新
 // PUT /users/profile/image
-router.put('/profile/image', protect, upload.single('image'), updateProfileImage);
+router.put('/profile/image', protect, (req, res, next) => {
+  upload.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('プロフィール画像 multer エラー:', err);
+      return res.status(400).json({ error: err.message || '画像のアップロードに失敗しました' });
+    }
+    next();
+  });
+}, updateProfileImage);
 
 // ======================================
 // Multer設定（ヘッダー画像アップロード用）
@@ -105,7 +111,15 @@ const uploadHeader = multer({
 
 // ヘッダー画像更新
 // PUT /users/profile/header-image
-router.put('/profile/header-image', protect, uploadHeader.single('image'), updateHeaderImage);
+router.put('/profile/header-image', protect, (req, res, next) => {
+  uploadHeader.single('image')(req, res, (err) => {
+    if (err) {
+      console.error('ヘッダー画像 multer エラー:', err);
+      return res.status(400).json({ error: err.message || 'ヘッダー画像のアップロードに失敗しました' });
+    }
+    next();
+  });
+}, updateHeaderImage);
 
 // ユーザー詳細取得
 // GET /users/:id

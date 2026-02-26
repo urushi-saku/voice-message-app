@@ -264,17 +264,27 @@ exports.getMe = async (req, res) => {
     // req.userはミドルウェアで設定される
     const user = await User.findById(req.user.id);
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'ユーザーが見つかりません',
+      });
+    }
+
     res.status(200).json({
       success: true,
-      id: user._id,
-      username: user.username,
-      handle: user.handle,
-      email: user.email,
-      profileImage: user.profileImage,
-      headerImage: user.headerImage,
-      bio: user.bio,
-      followersCount: user.followersCount,
-      followingCount: user.followingCount,
+      data: {
+        id: user._id,
+        _id: user._id,
+        username: user.username,
+        handle: user.handle,
+        email: user.email,
+        profileImage: user.profileImage,
+        headerImage: user.headerImage,
+        bio: user.bio,
+        followersCount: user.followersCount,
+        followingCount: user.followingCount,
+      }
     });
   } catch (error) {
     console.error('ユーザー情報取得エラー:', error);

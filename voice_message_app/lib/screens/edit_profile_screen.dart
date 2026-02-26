@@ -178,9 +178,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('プロフィールの更新に失敗しました: $e')));
+      debugPrint('プロフィール更新エラー詳細: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('プロフィールの更新に失敗しました:\n$e'),
+          duration: const Duration(seconds: 10),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -200,80 +204,113 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('プロフィール編集'),
-        elevation: 0,
-        actions: [
-          // 保存ボタン
-          if (_isLoading)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+      appBar: AppBar(title: const Text('プロフィール編集'), elevation: 0),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ========================================
+              // ヘッダー画像 ＋ アバター セクション
+              // ========================================
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Column(
+                    children: [
+                      // ヘッダー画像（200px）
+                      GestureDetector(
+                        onTap: _isLoading ? null : _pickHeaderImage,
+                        child: SizedBox(
+                          height: 200,
+                          width: double.infinity,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _selectedHeaderImage != null
+                                  ? Image.file(
+                                      _selectedHeaderImage!,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : (currentUser.headerImage != null
+                                        ? Image.network(
+                                            _imgUrl(currentUser.headerImage!),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                _headerPlaceholder(),
+                                          )
+                                        : _headerPlaceholder()),
+                              const Center(
+                                child: CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: Colors.black45,
+                                  child: Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 52),
+                    ],
                   ),
-                ),
-              ),
-            )
-          else
-            TextButton(
-              onPressed: _updateProfile,
-              child: const Text(
-                '保存',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ========================================
-            // ヘッダー画像 ＋ アバター セクション
-            // ========================================
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Column(
-                  children: [
-                    // ヘッダー画像（200px）
-                    GestureDetector(
-                      onTap: _isLoading ? null : _pickHeaderImage,
-                      child: SizedBox(
-                        height: 200,
-                        width: double.infinity,
+                  // プロフィールアバター（ヘッダー下端に重なる）
+                  Positioned(
+                    top: 160,
+                    left: 16,
+                    child: GestureDetector(
+                      onTap: _isLoading ? null : _pickImage,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 4),
+                        ),
                         child: Stack(
-                          fit: StackFit.expand,
                           children: [
-                            _selectedHeaderImage != null
-                                ? Image.file(
-                                    _selectedHeaderImage!,
-                                    fit: BoxFit.cover,
-                                  )
-                                : (currentUser.headerImage != null
-                                      ? Image.network(
-                                          _imgUrl(currentUser.headerImage!),
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              _headerPlaceholder(),
-                                        )
-                                      : _headerPlaceholder()),
-                            const Center(
+                            CircleAvatar(
+                              radius: 40,
+                              backgroundColor: const Color(0xFF7C4DFF),
+                              backgroundImage: _selectedImage != null
+                                  ? FileImage(_selectedImage!)
+                                  : (currentUser.profileImage != null
+                                            ? NetworkImage(
+                                                _imgUrl(
+                                                  currentUser.profileImage!,
+                                                ),
+                                              )
+                                            : null)
+                                        as ImageProvider?,
+                              child:
+                                  _selectedImage == null &&
+                                      currentUser.profileImage == null
+                                  ? Text(
+                                      currentUser.username.isNotEmpty
+                                          ? currentUser.username[0]
+                                                .toUpperCase()
+                                          : '?',
+                                      style: const TextStyle(
+                                        fontSize: 32,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
                               child: CircleAvatar(
-                                radius: 24,
-                                backgroundColor: Colors.black45,
-                                child: Icon(
+                                backgroundColor: Theme.of(context).primaryColor,
+                                radius: 14,
+                                child: const Icon(
                                   Icons.camera_alt,
+                                  size: 14,
                                   color: Colors.white,
-                                  size: 24,
                                 ),
                               ),
                             ),
@@ -281,78 +318,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 52),
-                  ],
-                ),
-                // プロフィールアバター（ヘッダー下端に重なる）
-                Positioned(
-                  top: 160,
-                  left: 16,
-                  child: GestureDetector(
-                    onTap: _isLoading ? null : _pickImage,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 4),
-                      ),
-                      child: Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 40,
-                            backgroundColor: const Color(0xFF7C4DFF),
-                            backgroundImage: _selectedImage != null
-                                ? FileImage(_selectedImage!)
-                                : (currentUser.profileImage != null
-                                          ? NetworkImage(
-                                              _imgUrl(
-                                                currentUser.profileImage!,
-                                              ),
-                                            )
-                                          : null)
-                                      as ImageProvider?,
-                            child:
-                                _selectedImage == null &&
-                                    currentUser.profileImage == null
-                                ? Text(
-                                    currentUser.username.isNotEmpty
-                                        ? currentUser.username[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      fontSize: 32,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: CircleAvatar(
-                              backgroundColor: Theme.of(context).primaryColor,
-                              radius: 14,
-                              child: const Icon(
-                                Icons.camera_alt,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
-            // ========================================
-            // フォーム
-            // ========================================
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              child: Form(
-                key: _formKey,
+              // ========================================
+              // フォーム
+              // ========================================
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -479,11 +453,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       '※メールアドレスは変更できません',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
+
+                    // ========================================
+                    // 保存ボタン
+                    // ========================================
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _updateProfile,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C4DFF),
+                          disabledBackgroundColor: Colors.grey[400],
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'プロフィールを保存',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

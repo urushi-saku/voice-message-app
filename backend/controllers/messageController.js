@@ -259,7 +259,11 @@ exports.getReceivedMessages = async (req, res) => {
     // キャッシュチェック
     const cacheKey = `received:${userId}`;
     const cached = await cache.get(cacheKey);
-    if (cached) return res.json(typeof cached === 'object' && cached.messages ? cached : { messages: cached });
+    if (cached) {
+      // キャッシュがある場合は配列形式で返す
+      return res.json(Array.isArray(cached) ? cached : cached.messages || cached);
+    }
+
     const messages = await Message.find({
       receivers: userId,
       isDeleted: false
@@ -292,7 +296,7 @@ exports.getReceivedMessages = async (req, res) => {
     });
 
     await cache.set(cacheKey, messagesWithReadStatus, cache.TTL.RECEIVED);
-    res.json({ messages: messagesWithReadStatus });
+    res.json(messagesWithReadStatus);
   } catch (error) {
     console.error('受信メッセージ取得エラー:', error);
     res.status(500).json({ error: '受信メッセージの取得に失敗しました' });
@@ -316,7 +320,22 @@ exports.getSentMessages = async (req, res) => {
       .populate('receivers', 'username email profileImage')
       .sort({ sentAt: -1 }); // 新しい順
 
-    res.json(messages);
+    res.json(messages.map(msg => ({
+      _id: msg._id.toString(),
+      receivers: msg.receivers.map(r => ({
+        _id: r._id.toString(),
+        username: r.username,
+        email: r.email,
+        profileImage: r.profileImage
+      })),
+      filePath: msg.filePath,
+      fileSize: msg.fileSize,
+      duration: msg.duration,
+      mimeType: msg.mimeType,
+      attachedImage: msg.attachedImage,
+      sentAt: msg.sentAt,
+      isDeleted: msg.isDeleted
+    })));
   } catch (error) {
     console.error('送信メッセージ取得エラー:', error);
     res.status(500).json({ error: '送信メッセージの取得に失敗しました' });

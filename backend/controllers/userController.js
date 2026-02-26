@@ -548,7 +548,12 @@ exports.updateHeaderImage = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
+    console.log('updateHeaderImage called');
+    console.log('req.file:', req.file);
+    console.log('req.files:', req.files);
+
     if (!req.file) {
+      console.error('ファイルが見つかりません');
       return res.status(400).json({ error: 'ヘッダー画像ファイルが必要です' });
     }
 

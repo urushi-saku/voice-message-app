@@ -472,22 +472,10 @@ class _VoiceCardScreenState extends State<VoiceCardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'ボイスカード',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black87,
-        elevation: 0,
+        title: const Text('ボイスカード'),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.black87,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.black87,
-          indicatorWeight: 2,
           tabs: const [
             Tab(text: '受け取ったカード'),
             Tab(text: '送ったカード'),
@@ -518,7 +506,7 @@ class _VoiceCardScreenState extends State<VoiceCardScreen>
       // ---- ボイスカードを送るボタン ----
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _onSendCard,
-        backgroundColor: const Color(0xFFFF6B35),
+        backgroundColor: const Color(0xFF7C4DFF),
         foregroundColor: Colors.white,
         elevation: 4,
         label: const Text(
