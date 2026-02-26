@@ -151,10 +151,7 @@ class _VoicePlaybackScreenState extends State<VoicePlaybackScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('保存に失敗しました: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('保存に失敗しました: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
