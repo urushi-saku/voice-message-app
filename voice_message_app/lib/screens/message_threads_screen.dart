@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/message_service.dart';
+import '../services/offline_service.dart';
 import 'select_follower_screen.dart';
 import 'thread_detail_screen.dart';
 import 'followers_tab.dart';
@@ -51,12 +52,78 @@ class _MessageThreadsScreenState extends State<MessageThreadsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        // "Exception: " プレフィックスを除去して表示
-        final msg = e.toString();
-        _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
-        _isLoading = false;
-      });
+      // ネットワークエラー時はオフラインキャッシュからスレッドを組み立て
+      final cachedThreads = await _buildThreadsFromCache();
+      if (cachedThreads.isNotEmpty) {
+        setState(() {
+          _threads = cachedThreads;
+          _isLoading = false;
+          // エラーは出さない（キャッシュ表示）
+        });
+      } else {
+        setState(() {
+          final msg = e.toString();
+          _error = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // ========================================
+  // キャッシュメッセージからスレッド一覧を組み立て
+  // ========================================
+  Future<List<ThreadInfo>> _buildThreadsFromCache() async {
+    try {
+      final cachedMessages = await OfflineService().getAllCachedMessages();
+      if (cachedMessages.isEmpty) return [];
+
+      // senderId でグループ化
+      final Map<String, List<dynamic>> grouped = {};
+      for (final msg in cachedMessages) {
+        grouped.putIfAbsent(msg.senderId, () => []).add(msg);
+      }
+
+      final threads = grouped.entries.map((entry) {
+        final msgs = entry.value..sort((a, b) => b.sentAt.compareTo(a.sentAt));
+        final latest = msgs.first;
+        final unread = msgs.where((m) => !m.isRead).length;
+
+        return ThreadInfo(
+          senderId: latest.senderId,
+          senderUsername: latest.senderName,
+          senderProfileImage: latest.senderProfileImage,
+          unreadCount: unread,
+          totalCount: msgs.length,
+          lastMessageAt: latest.sentAt,
+          lastMessage: MessageInfo(
+            id: latest.id,
+            senderId: latest.senderId,
+            senderUsername: latest.senderName,
+            senderProfileImage: latest.senderProfileImage,
+            messageType: latest.messageType,
+            textContent: latest.textContent,
+            isMine: false,
+            filePath: latest.filePath,
+            fileSize: latest.fileSize,
+            duration: latest.duration,
+            mimeType: latest.messageType == 'voice'
+                ? 'audio/m4a'
+                : 'text/plain',
+            sentAt: latest.sentAt,
+            isRead: latest.isRead,
+            readAt: latest.readAt,
+          ),
+        );
+      }).toList();
+
+      // 最新メッセージ順でソート
+      threads.sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+      debugPrint('[Offline] キャッシュから ${threads.length} スレッドを復元');
+      return threads;
+    } catch (e) {
+      debugPrint('[Offline] スレッドキャッシュ読み込みエラー: $e');
+      return [];
     }
   }
 

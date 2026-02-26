@@ -18,6 +18,7 @@ const {
   getUserById,
   updateProfile,
   updateProfileImage,
+  updateHeaderImage,
   getUsers,
   deleteAccount,
   updatePublicKey,
@@ -83,6 +84,28 @@ router.put('/profile', protect, updateProfile);
 // プロフィール画像更新
 // PUT /users/profile/image
 router.put('/profile/image', protect, upload.single('image'), updateProfileImage);
+
+// ======================================
+// Multer設定（ヘッダー画像アップロード用）
+// ======================================
+const headerStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/headers/');
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `header-${req.user.id}-${Date.now()}${ext}`);
+  }
+});
+const uploadHeader = multer({
+  storage: headerStorage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 最大10MB
+});
+
+// ヘッダー画像更新
+// PUT /users/profile/header-image
+router.put('/profile/header-image', protect, uploadHeader.single('image'), updateHeaderImage);
 
 // ユーザー詳細取得
 // GET /users/:id

@@ -39,6 +39,7 @@ class User {
   final String handle;
   final String email;
   final String? profileImage;
+  final String? headerImage;
   final String bio;
   final int followersCount;
   final int followingCount;
@@ -49,6 +50,7 @@ class User {
     required this.handle,
     required this.email,
     this.profileImage,
+    this.headerImage,
     this.bio = '',
     this.followersCount = 0,
     this.followingCount = 0,
@@ -62,6 +64,7 @@ class User {
       handle: u['handle'] ?? u['username'] ?? '',
       email: u['email'] ?? '',
       profileImage: u['profileImage'],
+      headerImage: u['headerImage'],
       bio: u['bio'] ?? '',
       followersCount: u['followersCount'] ?? 0,
       followingCount: u['followingCount'] ?? 0,
@@ -298,6 +301,7 @@ class AuthProvider extends ChangeNotifier {
         handle: u['handle'] ?? u['username'] ?? _user?.handle ?? '',
         email: u['email'] ?? _user?.email ?? '',
         profileImage: u['profileImage'] ?? _user?.profileImage,
+        headerImage: u['headerImage'] ?? _user?.headerImage,
         bio: u['bio'] ?? _user?.bio ?? '',
         followersCount: u['followersCount'] ?? _user?.followersCount ?? 0,
         followingCount: u['followingCount'] ?? _user?.followingCount ?? 0,
@@ -325,8 +329,10 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     // AuthWrapper がスタックにない場合も考慮し、ログイン画面へ強制遷移
-    NavigationService.navigator
-        ?.pushNamedAndRemoveUntil('/login', (route) => false);
+    NavigationService.navigator?.pushNamedAndRemoveUntil(
+      '/login',
+      (route) => false,
+    );
   }
 
   // ========================================

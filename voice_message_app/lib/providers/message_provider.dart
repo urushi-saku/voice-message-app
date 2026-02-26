@@ -7,6 +7,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/message.dart';
 import '../services/message_service.dart';
+import '../services/offline_service.dart';
 
 class MessageProvider extends ChangeNotifier {
   // ========================================
@@ -45,7 +46,14 @@ class MessageProvider extends ChangeNotifier {
         await loadMessagesWithoutMarkingRead(senderId);
       }
     } catch (e) {
-      _error = e.toString();
+      // ネットワークエラー時はオフラインキャッシュをフォールバック
+      final cachedMessages = await _loadFromOfflineCache(senderId);
+      if (cachedMessages.isNotEmpty) {
+        _messages = cachedMessages;
+        _error = null; // キャッシュがあるのでエラーを表示しない
+      } else {
+        _error = e.toString();
+      }
       _isLoading = false;
       notifyListeners();
     }
@@ -74,7 +82,14 @@ class MessageProvider extends ChangeNotifier {
       _messages = await MessageService.getThreadMessages(senderId);
       notifyListeners();
     } catch (e) {
-      debugPrint('メッセージ再読み込みエラー: $e');
+      // ネットワークエラー時はオフラインキャッシュをフォールバック
+      final cachedMessages = await _loadFromOfflineCache(senderId);
+      if (cachedMessages.isNotEmpty) {
+        _messages = cachedMessages;
+        notifyListeners();
+      } else {
+        debugPrint('メッセージ再読み込みエラー: $e');
+      }
     }
   }
 
@@ -153,5 +168,55 @@ class MessageProvider extends ChangeNotifier {
       readAt: msg.readAt,
       reactions: reactions,
     );
+  }
+
+  // ========================================
+  // オフラインキャッシュからスレッドメッセージを読み込み
+  // ========================================
+  Future<List<MessageInfo>> _loadFromOfflineCache(String senderId) async {
+    try {
+      final offlineService = OfflineService();
+      final cachedMessages = await offlineService.getAllCachedMessages();
+
+      // senderId とのスレッドメッセージを抽出
+      // （自分の送信メッセージ または 相手の受信メッセージ）
+      final threadMessages = cachedMessages
+          .where(
+            (msg) =>
+                msg.senderId == senderId || msg.receiverIds.contains(senderId),
+          )
+          .map(
+            (cached) => MessageInfo(
+              id: cached.id,
+              senderId: cached.senderId,
+              senderUsername: cached.senderName,
+              senderProfileImage: cached.senderProfileImage,
+              messageType: cached.messageType, // 'voice' or 'text'
+              textContent: cached.textContent,
+              isMine: false, // キャッシュは受信メッセージ
+              filePath: cached.filePath,
+              fileSize: cached.fileSize,
+              duration: cached.duration,
+              mimeType: cached.messageType == 'voice'
+                  ? 'audio/m4a'
+                  : 'text/plain',
+              thumbnailUrl: null,
+              sentAt: cached.sentAt,
+              isRead: cached.isRead,
+              readAt: cached.readAt,
+              reactions: [],
+            ),
+          )
+          .toList();
+
+      // 新しい順でソート
+      threadMessages.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+
+      debugPrint('[Offline] キャッシュから ${threadMessages.length} 件のメッセージを読み込み');
+      return threadMessages;
+    } catch (e) {
+      debugPrint('[Offline] キャッシュ読み込みエラー: $e');
+      return [];
+    }
   }
 }

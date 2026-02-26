@@ -123,6 +123,9 @@ dependencies:
   # 初学者向け説明：OSのKeychain/KeyStoreを使い、秘密鍵を安全に保存します
   flutter_secure_storage: ^9.2.4
 
+  # SVG画像レンダリング（Google ロゴなど）
+  flutter_svg: ^2.0.0
+
   # ========== エラーモニタリング ==========
   # Sentry エラートラッキング
   # 初学者向け説明：アプリのクラッシュやエラーをリアルタイムで
@@ -164,7 +167,6 @@ flutter:
   # マテリアルデザインで用意されたアイコンを使うための設定
   uses-material-design: true
 
-  # To add assets to your application, add an assets section, like this:
-  # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  # アプリケーションに含めるアセット（画像・SVGなど）
+  assets:
+    - assets/images/

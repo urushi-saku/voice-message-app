@@ -157,6 +157,12 @@ class CachedMessageInfo extends HiveObject {
   @HiveField(12)
   late bool isDownloaded; // ファイルがダウンロード済みか
 
+  @HiveField(13)
+  String messageType; // 'voice' または 'text'
+
+  @HiveField(14)
+  String? textContent; // テキストメッセージの場合のみ値を持つ
+
   CachedMessageInfo({
     required this.id,
     required this.senderId,
@@ -171,6 +177,8 @@ class CachedMessageInfo extends HiveObject {
     required this.sentAt,
     required this.cachedAt,
     required this.isDownloaded,
+    this.messageType = 'voice', // 旧キャッシュ後方互換のためデフォルト値
+    this.textContent,
   });
 
   /// キャッシュが古いかチェック（7日以上前）

@@ -163,6 +163,7 @@ exports.register = async (req, res) => {
         handle: user.handle,
         email: user.email,
         profileImage: user.profileImage,
+        headerImage: user.headerImage,
         bio: user.bio,
       },
     });
@@ -238,6 +239,7 @@ exports.login = async (req, res) => {
         handle: user.handle,
         email: user.email,
         profileImage: user.profileImage,
+        headerImage: user.headerImage,
         bio: user.bio,
         followersCount: user.followersCount,
         followingCount: user.followingCount,
@@ -269,6 +271,7 @@ exports.getMe = async (req, res) => {
       handle: user.handle,
       email: user.email,
       profileImage: user.profileImage,
+      headerImage: user.headerImage,
       bio: user.bio,
       followersCount: user.followersCount,
       followingCount: user.followingCount,

@@ -8,6 +8,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import '../constants.dart';
 import '../providers/auth_provider.dart';
 import '../services/user_service.dart';
 
@@ -26,8 +27,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioController = TextEditingController();
 
   File? _selectedImage;
+  File? _selectedHeaderImage;
   bool _isLoading = false;
   bool _isImageChanged = false;
+  bool _isHeaderImageChanged = false;
 
   @override
   void initState() {
@@ -76,6 +79,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// 画像パス → HTTP URL 変換
+  String _imgUrl(String path) {
+    if (path.startsWith('http')) return path;
+    return '$kServerUrl/$path';
+  }
+
+  /// ヘッダー未設定時のプレースホルダー
+  Widget _headerPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+        ),
+      ),
+    );
+  }
+
+  /// ========================================
+  /// ヘッダー画像選択（ギャラリーから）
+  /// ========================================
+  Future<void> _pickHeaderImage() async {
+    final ImagePicker picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _selectedHeaderImage = File(image.path);
+          _isHeaderImageChanged = true;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('ヘッダー画像の選択に失敗しました: $e')));
+    }
+  }
+
   /// ========================================
   /// プロフィール更新処理
   /// ========================================
@@ -95,6 +143,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // プロフィール画像が変更されている場合は先にアップロード
       if (_isImageChanged && _selectedImage != null) {
         await UserService.updateProfileImage(_selectedImage!);
+      }
+
+      // ヘッダー画像が変更されている場合はアップロード
+      if (_isHeaderImageChanged && _selectedHeaderImage != null) {
+        await UserService.updateHeaderImage(_selectedHeaderImage!);
       }
 
       // ユーザー名またはhandleまたは自己紹介が変更されている場合は更新
@@ -180,182 +233,257 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ========================================
+            // ヘッダー画像 ＋ アバター セクション
+            // ========================================
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                const SizedBox(height: 24),
-
-                // ========================================
-                // プロフィール画像
-                // ========================================
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.deepPurple,
-                        backgroundImage: _selectedImage != null
-                            ? FileImage(_selectedImage!)
-                            : (currentUser.profileImage != null
-                                      ? NetworkImage(currentUser.profileImage!)
-                                      : null)
-                                  as ImageProvider?,
-                        child:
-                            _selectedImage == null &&
-                                currentUser.profileImage == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 70,
-                                color: Colors.white,
-                              )
-                            : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: CircleAvatar(
-                          backgroundColor: Theme.of(context).primaryColor,
-                          radius: 18,
-                          child: const Icon(
-                            Icons.camera_alt,
-                            size: 18,
-                            color: Colors.white,
-                          ),
+                Column(
+                  children: [
+                    // ヘッダー画像（200px）
+                    GestureDetector(
+                      onTap: _isLoading ? null : _pickHeaderImage,
+                      child: SizedBox(
+                        height: 200,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _selectedHeaderImage != null
+                                ? Image.file(
+                                    _selectedHeaderImage!,
+                                    fit: BoxFit.cover,
+                                  )
+                                : (currentUser.headerImage != null
+                                      ? Image.network(
+                                          _imgUrl(currentUser.headerImage!),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              _headerPlaceholder(),
+                                        )
+                                      : _headerPlaceholder()),
+                            const Center(
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.black45,
+                                child: Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 52),
+                  ],
                 ),
-
-                const SizedBox(height: 8),
-                Text(
-                  'タップして画像を選択',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-
-                const SizedBox(height: 32),
-
-                // ========================================
-                // ユーザー名入力
-                // ========================================
-                TextFormField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'ユーザー名（表示名）',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'ユーザー名を入力してください';
-                    }
-                    if (value.trim().length > 30) {
-                      return 'ユーザー名は30文字以内で設定してください';
-                    }
-                    return null;
-                  },
-                  enabled: !_isLoading,
-                ),
-
-                const SizedBox(height: 16),
-
-                // ========================================
-                // ID入力
-                // ========================================
-                TextFormField(
-                  controller: _handleController,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: 'ID（@handle）',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.alternate_email),
-                    prefixText: '@',
-                    helperText: '英小文字・数字・_の3〜20文字',
-                    helperStyle: TextStyle(color: Colors.grey[600]),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'IDを入力してください';
-                    }
-                    final regex = RegExp(r'^[a-z0-9_]{3,20}$');
-                    if (!regex.hasMatch(value.toLowerCase().trim())) {
-                      return 'IDは英小文字・数字・_の3〜20文字で入力してください';
-                    }
-                    return null;
-                  },
-                  enabled: !_isLoading,
-                ),
-
-                const SizedBox(height: 16),
-
-                // ========================================
-                // 自己紹介入力
-                // ========================================
-                TextFormField(
-                  controller: _bioController,
-                  decoration: const InputDecoration(
-                    labelText: '自己紹介',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.info_outline),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: 4,
-                  maxLength: 200,
-                  validator: (value) {
-                    if (value != null && value.length > 200) {
-                      return '自己紹介は200文字以内で設定してください';
-                    }
-                    return null;
-                  },
-                  enabled: !_isLoading,
-                ),
-
-                const SizedBox(height: 24),
-
-                // ========================================
-                // メールアドレス表示（変更不可）
-                // ========================================
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.email, color: Colors.grey),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                // プロフィールアバター（ヘッダー下端に重なる）
+                Positioned(
+                  top: 160,
+                  left: 16,
+                  child: GestureDetector(
+                    onTap: _isLoading ? null : _pickImage,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 4),
+                      ),
+                      child: Stack(
                         children: [
-                          const Text(
-                            'メールアドレス',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          CircleAvatar(
+                            radius: 40,
+                            backgroundColor: const Color(0xFF7C4DFF),
+                            backgroundImage: _selectedImage != null
+                                ? FileImage(_selectedImage!)
+                                : (currentUser.profileImage != null
+                                          ? NetworkImage(
+                                              _imgUrl(
+                                                currentUser.profileImage!,
+                                              ),
+                                            )
+                                          : null)
+                                      as ImageProvider?,
+                            child:
+                                _selectedImage == null &&
+                                    currentUser.profileImage == null
+                                ? Text(
+                                    currentUser.username.isNotEmpty
+                                        ? currentUser.username[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            currentUser.email,
-                            style: const TextStyle(fontSize: 14),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: CircleAvatar(
+                              backgroundColor: Theme.of(context).primaryColor,
+                              radius: 14,
+                              child: const Icon(
+                                Icons.camera_alt,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 8),
-                Text(
-                  '※メールアドレスは変更できません',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ],
             ),
-          ),
+
+            // ========================================
+            // フォーム
+            // ========================================
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'アバター・ヘッダー画像をタップして変更',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ========================================
+                    // ユーザー名入力
+                    // ========================================
+                    TextFormField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'ユーザー名（表示名）',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'ユーザー名を入力してください';
+                        }
+                        if (value.trim().length > 30) {
+                          return 'ユーザー名は30文字以内で設定してください';
+                        }
+                        return null;
+                      },
+                      enabled: !_isLoading,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ========================================
+                    // ID入力
+                    // ========================================
+                    TextFormField(
+                      controller: _handleController,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: 'ID（@handle）',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.alternate_email),
+                        prefixText: '@',
+                        helperText: '英小文字・数字・_の3〜20文字',
+                        helperStyle: TextStyle(color: Colors.grey[600]),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'IDを入力してください';
+                        }
+                        final regex = RegExp(r'^[a-z0-9_]{3,20}$');
+                        if (!regex.hasMatch(value.toLowerCase().trim())) {
+                          return 'IDは英小文字・数字・_の3〜20文字で入力してください';
+                        }
+                        return null;
+                      },
+                      enabled: !_isLoading,
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ========================================
+                    // 自己紹介入力
+                    // ========================================
+                    TextFormField(
+                      controller: _bioController,
+                      decoration: const InputDecoration(
+                        labelText: '自己紹介',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.info_outline),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 4,
+                      maxLength: 200,
+                      validator: (value) {
+                        if (value != null && value.length > 200) {
+                          return '自己紹介は200文字以内で設定してください';
+                        }
+                        return null;
+                      },
+                      enabled: !_isLoading,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // ========================================
+                    // メールアドレス表示（変更不可）
+                    // ========================================
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.email, color: Colors.grey),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'メールアドレス',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                currentUser.email,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+                    Text(
+                      '※メールアドレスは変更できません',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

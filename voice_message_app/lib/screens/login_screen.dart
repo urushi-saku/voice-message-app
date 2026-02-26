@@ -22,6 +22,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../providers/auth_provider.dart';
 
 /// ログイン画面ウィジェット
@@ -338,7 +339,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         }
                       }
                     },
-                    icon: const Icon(Icons.g_mobiledata, size: 20),
+                    icon: SvgPicture.asset(
+                      'assets/images/google_logo.svg',
+                      width: 20,
+                      height: 20,
+                    ),
                     label: const Text(
                       'Google でログイン',
                       style: TextStyle(fontSize: 16, color: Colors.black87),

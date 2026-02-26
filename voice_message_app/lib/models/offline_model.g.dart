@@ -146,13 +146,16 @@ class CachedMessageInfoAdapter extends TypeAdapter<CachedMessageInfo> {
       sentAt: fields[10] as DateTime,
       cachedAt: fields[11] as DateTime,
       isDownloaded: fields[12] as bool,
+      // 旧データには存在しないフィールド → null 時はデフォルト値にフォールバック
+      messageType: (fields[13] as String?) ?? 'voice',
+      textContent: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CachedMessageInfo obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -178,7 +181,11 @@ class CachedMessageInfoAdapter extends TypeAdapter<CachedMessageInfo> {
       ..writeByte(11)
       ..write(obj.cachedAt)
       ..writeByte(12)
-      ..write(obj.isDownloaded);
+      ..write(obj.isDownloaded)
+      ..writeByte(13)
+      ..write(obj.messageType)
+      ..writeByte(14)
+      ..write(obj.textContent);
   }
 
   @override

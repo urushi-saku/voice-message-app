@@ -57,6 +57,12 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // ヘッダー（カバー）画像URL
+    headerImage: {
+      type: String,
+      default: null,
+    },
+
     // 自己紹介
     bio: {
       type: String,

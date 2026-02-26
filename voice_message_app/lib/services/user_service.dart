@@ -16,6 +16,7 @@ class UserInfo {
   final String handle;
   final String email;
   final String? profileImage;
+  final String? headerImage;
   final String bio;
   final int followersCount;
   final int followingCount;
@@ -26,6 +27,7 @@ class UserInfo {
     required this.handle,
     required this.email,
     this.profileImage,
+    this.headerImage,
     required this.bio,
     required this.followersCount,
     required this.followingCount,
@@ -39,6 +41,7 @@ class UserInfo {
       handle: json['handle'] ?? json['username'] ?? '',
       email: json['email'] ?? '',
       profileImage: json['profileImage'],
+      headerImage: json['headerImage'],
       bio: json['bio'] ?? '',
       followersCount: json['followersCount'] ?? 0,
       followingCount: json['followingCount'] ?? 0,
@@ -304,6 +307,38 @@ class UserService {
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['error'] ?? 'プロフィール画像の更新に失敗しました');
+    }
+  }
+
+  /// ========================================
+  /// ヘッダー画像更新
+  /// PUT /users/profile/header-image
+  /// ========================================
+  static Future<UserInfo> updateHeaderImage(File imageFile) async {
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('認証が必要です');
+    }
+
+    final request = http.MultipartRequest(
+      'PUT',
+      Uri.parse('$BASE_URL/users/profile/header-image'),
+    );
+
+    request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      await http.MultipartFile.fromPath('image', imageFile.path),
+    );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return UserInfo.fromJson(data['user']);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['error'] ?? 'ヘッダー画像の更新に失敗しました');
     }
   }
 

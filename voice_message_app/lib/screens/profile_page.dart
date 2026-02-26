@@ -1,12 +1,10 @@
 // ========================================
 // プロフィールページ
 // ========================================
-// 初学者向け説明：
-// このファイルは、ユーザーのプロフィール情報を表示するページです
-// 認証情報を表示し、ログアウト機能を提供します
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants.dart';
 import '../providers/auth_provider.dart';
 import 'edit_profile_screen.dart';
 import 'followers_tab.dart';
@@ -16,178 +14,282 @@ import 'settings_screen.dart';
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  /// 画像パス → HTTP URL 変換ヘルパー
+  static String _imgUrl(String path) {
+    if (path.startsWith('http')) return path;
+    return '$kServerUrl/$path';
+  }
+
+  /// ヘッダー上に重ねるアイコンボタン
+  Widget _overlayButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.black45,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('プロフィール'),
-        elevation: 0,
-        actions: [
-          // 設定ボタン
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-            tooltip: '設定',
-          ),
-          // 編集ボタン
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EditProfileScreen(),
-                ),
-              );
-            },
-            tooltip: 'プロフィール編集',
-          ),
-        ],
-      ),
-      body: Consumer<AuthProvider>(
-        builder: (context, authProvider, _) {
-          final user = authProvider.user;
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        final user = authProvider.user;
 
-          if (user == null) {
-            return const Center(child: Text('ユーザー情報が見つかりません'));
-          }
+        if (user == null) {
+          return const Scaffold(body: Center(child: Text('ユーザー情報が見つかりません')));
+        }
 
-          return SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            top: true,
+            child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ========================================
-                  // ユーザーアイコン
+                  // ヘッダー画像 ＋ アバター セクション
                   // ========================================
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.deepPurple,
-                    backgroundImage: user.profileImage != null
-                        ? NetworkImage(user.profileImage!)
-                        : null,
-                    child: user.profileImage == null
-                        ? const Icon(
-                            Icons.person,
-                            size: 60,
-                            color: Colors.white,
-                          )
-                        : null,
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ========================================
-                  // ユーザー名
-                  // ========================================
-                  Text(
-                    user.username,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ========================================
-                  // ユーザーID
-                  // ========================================
-                  Text(
-                    '@${user.handle}',
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ========================================
-                  // 自己紹介
-                  // ========================================
-                  if (user.bio.isNotEmpty) ...[
-                    Text(
-                      user.bio,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // ========================================
-                  // フォロー情報（タップでフォロワー画面へ）
-                  // ========================================
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const FollowersTab(initialTabIndex: 0),
+                      Column(
+                        children: [
+                          // ヘッダー画像（200px）
+                          SizedBox(
+                            height: 200,
+                            width: double.infinity,
+                            child: user.headerImage != null
+                                ? Image.network(
+                                    _imgUrl(user.headerImage!),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _headerPlaceholder(),
+                                  )
+                                : _headerPlaceholder(),
                           ),
-                        ),
-                        child: Column(
+                          // アバター下半分 + 余白
+                          const SizedBox(height: 52),
+                        ],
+                      ),
+
+                      // 設定・編集ボタン（ヘッダー右上）
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Row(
                           children: [
-                            Text(
-                              user.followersCount.toString(),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                            _overlayButton(
+                              icon: Icons.settings,
+                              tooltip: '設定',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen(),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'フォロワー',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
+                            const SizedBox(width: 6),
+                            _overlayButton(
+                              icon: Icons.edit,
+                              tooltip: 'プロフィール編集',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const EditProfileScreen(),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Container(width: 1, height: 40, color: Colors.grey[300]),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const FollowersTab(initialTabIndex: 1),
+
+                      // プロフィールアバター（ヘッダー下端に重なる）
+                      Positioned(
+                        top: 160, // 200 - radius(40)
+                        left: 16,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        ),
-                        child: Column(
-                          children: [
-                            Text(
-                              user.followingCount.toString(),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'フォロー中',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                          child: CircleAvatar(
+                            radius: 40,
+                            backgroundColor: const Color(0xFF7C4DFF),
+                            backgroundImage: user.profileImage != null
+                                ? NetworkImage(_imgUrl(user.profileImage!))
+                                : null,
+                            child: user.profileImage == null
+                                ? Text(
+                                    user.username.isNotEmpty
+                                        ? user.username[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
                         ),
                       ),
                     ],
                   ),
+
+                  // ========================================
+                  // プロフィール情報
+                  // ========================================
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ユーザー名
+                        Text(
+                          user.username,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+
+                        // ハンドル
+                        Text(
+                          '@${user.handle}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+
+                        // 自己紹介
+                        if (user.bio.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            user.bio,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[800],
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 16),
+                        const Divider(height: 1),
+                        const SizedBox(height: 16),
+
+                        // フォロー情報
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const FollowersTab(initialTabIndex: 0),
+                                ),
+                              ),
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${user.followersCount}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: ' フォロワー',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const FollowersTab(initialTabIndex: 1),
+                                ),
+                              ),
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '${user.followingCount}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: ' フォロー中',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
+    );
+  }
+
+  /// ヘッダー未設定時のグラデーションプレースホルダー
+  Widget _headerPlaceholder() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF7C4DFF), Color(0xFF512DA8)],
+        ),
       ),
     );
   }

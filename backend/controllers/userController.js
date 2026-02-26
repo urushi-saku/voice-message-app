@@ -39,7 +39,7 @@ exports.getUsers = async (req, res) => {
 
     const [users, total] = await Promise.all([
       User.find(filter)
-        .select('username handle profileImage bio followersCount followingCount')
+        .select('username handle profileImage headerImage bio followersCount followingCount')
         .sort({ followersCount: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -52,6 +52,7 @@ exports.getUsers = async (req, res) => {
         username: u.username,
         handle: u.handle,
         profileImage: u.profileImage,
+        headerImage: u.headerImage,
         bio: u.bio,
         followersCount: u.followersCount,
         followingCount: u.followingCount,
@@ -96,6 +97,10 @@ exports.deleteAccount = async (req, res) => {
     // プロフィール画像の物理削除
     if (user.profileImage) {
       try { await fs.unlink(user.profileImage); } catch (_) {}
+    }
+    // ヘッダー画像の物理削除
+    if (user.headerImage) {
+      try { await fs.unlink(user.headerImage); } catch (_) {}
     }
 
     // 自分が送信した音声ファイルの物理削除
@@ -157,7 +162,7 @@ exports.searchUsers = async (req, res) => {
         { username: { $regex: q, $options: 'i' } },
       ]
     })
-      .select('username handle email profileImage bio followersCount followingCount')
+      .select('username handle email profileImage headerImage bio followersCount followingCount')
       .limit(20);
 
     res.json(users);
@@ -384,7 +389,7 @@ exports.getUserById = async (req, res) => {
     if (cached) return res.json(cached);
 
     const user = await User.findById(userId)
-      .select('username handle email profileImage bio followersCount followingCount createdAt');
+      .select('username handle email profileImage headerImage bio followersCount followingCount createdAt');
 
     if (!user) {
       return res.status(404).json({ error: 'ユーザーが見つかりません' });
@@ -396,6 +401,7 @@ exports.getUserById = async (req, res) => {
       handle: user.handle,
       email: user.email,
       profileImage: user.profileImage,
+      headerImage: user.headerImage,
       bio: user.bio,
       followersCount: user.followersCount,
       followingCount: user.followingCount,
@@ -467,7 +473,7 @@ exports.updateProfile = async (req, res) => {
       currentUserId,
       { $set: updateFields },
       { new: true, runValidators: true }
-    ).select('username handle email profileImage bio followersCount followingCount');
+    ).select('username handle email profileImage headerImage bio followersCount followingCount');
 
     // プロフィール更新後にキャッシュを無効化
     await cache.del(`user:${currentUserId}`);
@@ -519,7 +525,7 @@ exports.updateProfileImage = async (req, res) => {
       currentUserId,
       { $set: { profileImage: profileImagePath } },
       { new: true }
-    ).select('username email profileImage bio followersCount followingCount');
+    ).select('username email profileImage headerImage bio followersCount followingCount');
 
     // プロフィール画像更新後にキャッシュを無効化
     await cache.del(`user:${currentUserId}`);
@@ -531,6 +537,44 @@ exports.updateProfileImage = async (req, res) => {
   } catch (error) {
     console.error('プロフィール画像更新エラー:', error);
     res.status(500).json({ error: 'プロフィール画像の更新に失敗しました' });
+  }
+};
+
+// ========================================
+// ヘッダー画像更新
+// PUT /users/profile/header-image
+// ========================================
+exports.updateHeaderImage = async (req, res) => {
+  try {
+    const currentUserId = req.user.id;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'ヘッダー画像ファイルが必要です' });
+    }
+
+    const headerImagePath = req.file.path.replace(/\\/g, '/');
+
+    // 古いヘッダー画像があれば削除
+    const user = await User.findById(currentUserId);
+    if (user.headerImage) {
+      try { await require('fs').promises.unlink(user.headerImage); } catch (_) {}
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      currentUserId,
+      { $set: { headerImage: headerImagePath } },
+      { new: true }
+    ).select('username email profileImage headerImage bio followersCount followingCount');
+
+    await cache.del(`user:${currentUserId}`);
+
+    res.json({
+      message: 'ヘッダー画像を更新しました',
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('ヘッダー画像更新エラー:', error);
+    res.status(500).json({ error: 'ヘッダー画像の更新に失敗しました' });
   }
 };
 

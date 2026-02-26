@@ -444,10 +444,43 @@ class MessageService {
         sentAt: msg.sentAt,
         cachedAt: DateTime.now(),
         isDownloaded: false,
+        messageType: msg.messageType, // 'voice' または 'text'
+        textContent: msg.textContent, // テキストメッセージの場合のみ
       );
     }).toList();
 
     await offlineService.cacheMultipleMessages(cachedMessages);
+  }
+
+  /// スレッド一覧の最新メッセージをキャッシュに保存
+  static Future<void> _cacheThreadMessages(List<ThreadInfo> threads) async {
+    try {
+      final offlineService = OfflineService();
+      final cachedMessages = threads.map((thread) {
+        final msg = thread.lastMessage;
+        return CachedMessageInfo(
+          id: msg.id,
+          senderId: thread.senderId,
+          senderName: thread.senderUsername,
+          senderProfileImage: thread.senderProfileImage,
+          receiverIds: [],
+          filePath: msg.filePath,
+          duration: msg.duration ?? 0,
+          fileSize: msg.fileSize,
+          isRead: msg.isRead,
+          readAt: msg.readAt,
+          sentAt: msg.sentAt,
+          cachedAt: DateTime.now(),
+          isDownloaded: false,
+          messageType: msg.messageType,
+          textContent: msg.textContent,
+        );
+      }).toList();
+
+      await offlineService.cacheMultipleMessages(cachedMessages);
+    } catch (e) {
+      print('[Cache] スレッドキャッシュ保存エラー: $e');
+    }
   }
 
   /// ========================================
@@ -760,8 +793,19 @@ class MessageService {
       }
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
-        return jsonList.map((json) => ThreadInfo.fromJson(json)).toList();
+        final decoded = jsonDecode(response.body);
+        // バックエンドは { "threads": [...] } を返す
+        final List<dynamic> jsonList = decoded is Map
+            ? (decoded['threads'] as List? ?? [])
+            : decoded as List;
+        final threads = jsonList
+            .map((json) => ThreadInfo.fromJson(json))
+            .toList();
+
+        // スレッドの最新メッセージをキャッシュ（オフライン時のフォールバック用）
+        _cacheThreadMessages(threads);
+
+        return threads;
       } else {
         final body = jsonDecode(response.body) as Map<String, dynamic>;
         throw Exception(
